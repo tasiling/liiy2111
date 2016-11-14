@@ -1,0 +1,9 @@
+需放入場景：
+egg_fin(Tag:eggs)
+meat_fin(Tag:meat)
+vege_fin(Tag:vage)
+Steak(Tag:Steak)(關閉狀態，與pot重合)
+pot_fin(掛上simplecook)
+
+更新：
+move.cs
