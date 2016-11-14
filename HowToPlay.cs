@@ -10,11 +10,9 @@ public class HowToPlay : MonoBehaviour {
 	
 	// Update is called once per frame
 	void Update () {
-		Debug.Log ("go");
-		if (Input.GetKeyDown (KeyCode.Mouse0))
-			Debug.Log (1);
-			this.gameObject.SetActive(false);
-	
+		if (Input.GetKeyDown (KeyCode.Mouse0)) {
+			this.gameObject.SetActive (false);
+		}
 	}
 		
 }
