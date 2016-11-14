@@ -9,6 +9,7 @@ public class move : MonoBehaviour {
 
 	// Use this for initialization
 	void Start () {
+		speed = 1;
 		animator = GetComponent<Animator> ();
 		animator.SetBool ("attackable", true);
 		animator.SetBool ("moveable", true);
