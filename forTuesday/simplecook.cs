@@ -1,9 +1,11 @@
 ﻿using UnityEngine;
 using System.Collections;
+using UnityEngine.Networking;
 
-public class simplecook : MonoBehaviour {
+public class simplecook : NetworkBehaviour {
 
 	public GameObject getfood;
+	[SyncVar]
 	public int i;
 	public static bool gotit;
 	public GameObject Steak;
@@ -15,7 +17,7 @@ public class simplecook : MonoBehaviour {
 		dish = Steak.GetComponent<Rigidbody> ();
 
 	}
-	
+
 	// Update is called once per frame
 	void Update () {
 		if (i == 3) {
@@ -24,7 +26,6 @@ public class simplecook : MonoBehaviour {
 			i++;
 		}
 	}
-
 	void OnTriggerEnter(Collider other){
 		if (other.CompareTag ("Player")) {
 			if (move.havefood == true) {

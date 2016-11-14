@@ -77,7 +77,7 @@ public class move : MonoBehaviour {
 			simplecook.gotit = false;
 		}
 
-
+		myfood.transform.localPosition = new Vector3 (0, 2, 0);
 	}
 
 	void OnTriggerEnter(Collider foodonground){
