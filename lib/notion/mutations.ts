@@ -1,0 +1,128 @@
+import { notion, withNotionRateLimit } from "./client";
+import { DATA_SOURCES, SESSION_STATUS_ORDER, type SessionStatus } from "./schema";
+import { titleProp, richTextProp, selectProp, dateProp, relationProp } from "./properties";
+import { queryAll } from "./queries";
+import { readTitle } from "./properties";
+
+// Session 編號格式:S-YYYYMMDD-流水號(總綱 DB-03)。流水號以當日已存在筆數 +1 計算。
+export async function nextSessionCode(dateISO: string): Promise<string> {
+  const ymd = dateISO.replace(/-/g, "");
+  const existing = await queryAll(DATA_SOURCES.DB03_抽牌Session, {
+    property: "Session 編號",
+    title: { starts_with: `S-${ymd}-` },
+  });
+  const serial = existing.length + 1;
+  return `S-${ymd}-${String(serial).padStart(3, "0")}`;
+}
+
+export async function createSession(params: {
+  dateISO: string; // 建立日期
+  項目用途?: string; // 選填:序列展開產出的文案任務沒有對應選項可用時留空(見 docs/schema/項目用途落差說明.md)
+  模式: "單筆" | "批次";
+  狀態?: SessionStatus;
+  備註?: string;
+}) {
+  const code = await nextSessionCode(params.dateISO);
+  const page = await withNotionRateLimit(() =>
+    notion().pages.create({
+      parent: { type: "data_source_id", data_source_id: DATA_SOURCES.DB03_抽牌Session },
+      properties: {
+        "Session 編號": titleProp(code),
+        建立日期: dateProp(params.dateISO),
+        ...(params.項目用途 ? { 項目用途: selectProp(params.項目用途) } : {}),
+        模式: selectProp(params.模式),
+        狀態: selectProp(params.狀態 ?? "已抽牌"),
+        ...(params.備註 ? { 備註: richTextProp(params.備註) } : {}),
+      },
+    })
+  );
+  return { id: page.id, code };
+}
+
+export async function createDetail(params: {
+  sessionId: string;
+  sessionCode: string;
+  對應日期: string;
+  序: number; // 批次內第幾筆,用於組明細編號
+}) {
+  const 明細編號 = `${params.sessionCode}-${String(params.序).padStart(2, "0")}`;
+  const page = await withNotionRateLimit(() =>
+    notion().pages.create({
+      parent: { type: "data_source_id", data_source_id: DATA_SOURCES.DB04_抽牌明細 },
+      properties: {
+        明細編號: titleProp(明細編號),
+        對應日期: dateProp(params.對應日期),
+        "所屬 Session": relationProp([params.sessionId]),
+      },
+    })
+  );
+  return { id: page.id, 明細編號 };
+}
+
+// 明細標題可自訂文字(用於序列展開任務,把節點內容類型編碼進標題,
+// 因為 DB-04 明細沒有獨立欄位可記錄節點/內容類型 —— 見落差說明文件)。
+export async function createDetailWithTitle(params: {
+  sessionId: string;
+  明細編號: string;
+  對應日期: string;
+}) {
+  const page = await withNotionRateLimit(() =>
+    notion().pages.create({
+      parent: { type: "data_source_id", data_source_id: DATA_SOURCES.DB04_抽牌明細 },
+      properties: {
+        明細編號: titleProp(params.明細編號),
+        對應日期: dateProp(params.對應日期),
+        "所屬 Session": relationProp([params.sessionId]),
+      },
+    })
+  );
+  return { id: page.id, 明細編號: params.明細編號 };
+}
+
+// 抽牌輸入:寫入抽出牌卡(relation)+ 抽出順序(權威順序文字,如 "MP-15, MP-17, MP-09")
+export async function writeDraw(params: {
+  detailId: string;
+  cardPageIds: string[];
+  orderText: string;
+}) {
+  await withNotionRateLimit(() =>
+    notion().pages.update({
+      page_id: params.detailId,
+      properties: {
+        抽出牌卡: relationProp(params.cardPageIds),
+        抽出順序: richTextProp(params.orderText),
+      },
+    })
+  );
+}
+
+// 狀態機只允許順序推進;跳步需呼叫端先取得二次確認(allowSkip=true)才放行。
+export function canAdvance(
+  current: SessionStatus,
+  next: SessionStatus,
+  allowSkip: boolean
+): { ok: boolean; reason?: string } {
+  const curIdx = SESSION_STATUS_ORDER.indexOf(current);
+  const nextIdx = SESSION_STATUS_ORDER.indexOf(next);
+  if (curIdx === -1 || nextIdx === -1) return { ok: false, reason: "未知狀態" };
+  if (nextIdx <= curIdx) return { ok: false, reason: "只能往前推進,不可回退或停留" };
+  if (nextIdx > curIdx + 1 && !allowSkip) {
+    return { ok: false, reason: "跳步需二次確認(allowSkip)" };
+  }
+  return { ok: true };
+}
+
+export async function updateSessionStatus(sessionId: string, newStatus: SessionStatus) {
+  await withNotionRateLimit(() =>
+    notion().pages.update({
+      page_id: sessionId,
+      properties: { 狀態: selectProp(newStatus) },
+    })
+  );
+}
+
+export async function findSessionCodeById(sessionId: string): Promise<string> {
+  const page = await withNotionRateLimit(() => notion().pages.retrieve({ page_id: sessionId }));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return readTitle(page as any, "Session 編號");
+}
