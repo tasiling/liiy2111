@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { SESSION_STATUS_ORDER, SESSION_項目用途 } from "@/lib/notion/schema";
 
-const STATUS_ORDER = ["已抽牌", "已指定用途", "解讀中", "已產出", "已交付"];
-const 項目用途_OPTIONS = ["能量流", "大眾占卜", "日更", "個案", "實驗"];
+const STATUS_ORDER: readonly string[] = SESSION_STATUS_ORDER;
+const 項目用途_OPTIONS: readonly string[] = SESSION_項目用途;
 
 type SessionRow = {
   id: string;

@@ -31,7 +31,25 @@ export const SESSION_STATUS_ORDER = [
 ] as const;
 export type SessionStatus = (typeof SESSION_STATUS_ORDER)[number];
 
-export const SESSION_項目用途 = ["能量流", "大眾占卜", "日更", "個案", "實驗"] as const;
+// v1.3(產線 A 委派書):擁有者已在 Notion 手動新增後 4 個選項,解決序列展開任務無處分類的落差。
+export const SESSION_項目用途 = [
+  "能量流",
+  "大眾占卜",
+  "日更",
+  "個案",
+  "實驗",
+  "事件序列文",
+  "邀請文",
+  "心理測驗",
+  "個人心得",
+] as const;
+
+// P2 序列展開引擎(讀 DB-07 序列節點表)產出的任務一律屬於事件宣傳序列,對應此分類。
+export const EXPAND_ENGINE_項目用途 = "事件序列文" as const;
+// 三更邀請文、二更心理測驗尚未有產生任務的功能(不在 P1/P5/P2 範圍內);
+// 未來實作對應功能時,應分別使用以下分類,不得沿用 EXPAND_ENGINE_項目用途。
+export const 三更_項目用途 = "邀請文" as const;
+export const 二更_項目用途 = "心理測驗" as const;
 export const SESSION_模式 = ["單筆", "批次"] as const;
 
 // DB-07 序列節點表 錨點
