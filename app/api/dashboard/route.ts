@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  listDetailsInRange,
-  listSlotsInRange,
-  listSessionsCreatedBetween,
-  getSession,
-} from "@/lib/notion/queries";
+import { listDetailsInRange, listSlotsInRange, getSession } from "@/lib/notion/queries";
 import { SESSION_STATUS_ORDER } from "@/lib/notion/schema";
 
 function monthRange(yearMonth: string): { start: string; end: string } {
@@ -21,10 +16,9 @@ export async function GET(req: NextRequest) {
   const { start, end } = monthRange(yearMonth);
   const today = new Date().toISOString().slice(0, 10);
 
-  const [details, slots, sessionsThisMonth] = await Promise.all([
+  const [details, slots] = await Promise.all([
     listDetailsInRange(start, end),
     listSlotsInRange(start, end),
-    listSessionsCreatedBetween(start, end),
   ]);
 
   // 明細需回頭查所屬 Session 的狀態/項目用途,才能在行事曆標示「實驗」等視覺標記。
@@ -58,13 +52,16 @@ export async function GET(req: NextRequest) {
     狀態: s.狀態,
   }));
 
+  // 完成度按明細的「對應日期」歸月:一個 Session 只要在本月有對應日期的明細,就計入本月
+  // (跨月批次會分別計入它涉及的每個月,不再用 Session「建立日期」歸月)。
   const completion: Record<string, number> = Object.fromEntries(
     SESSION_STATUS_ORDER.map((s) => [s, 0])
   );
-  for (const s of sessionsThisMonth) {
-    if (s.狀態 && s.狀態 in completion) completion[s.狀態]++;
+  for (const id of uniqueSessionIds) {
+    const status = sessionMap.get(id)?.狀態;
+    if (status && status in completion) completion[status]++;
   }
-  const total = sessionsThisMonth.length;
+  const total = uniqueSessionIds.length;
 
   const todayTasks = [
     ...calendarFromDetails.filter((t) => t.日期 === today),

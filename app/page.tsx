@@ -22,6 +22,8 @@ type DashboardData = {
 };
 
 const STATUS_ORDER = ["已抽牌", "已指定用途", "解讀中", "已產出", "已交付"];
+const WEEKDAY_LABELS = ["日", "一", "二", "三", "四", "五", "六"];
+const MAX_PREVIEW_PER_DAY = 2;
 
 function shiftMonth(yearMonth: string, delta: number): string {
   const [y, m] = yearMonth.split("-").map(Number);
@@ -29,11 +31,36 @@ function shiftMonth(yearMonth: string, delta: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
+function isoOf(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// 月曆網格:含前後月補位日,湊滿整週,週日為每列第一天。
+function buildMonthGrid(yearMonth: string): { date: Date; iso: string; inMonth: boolean }[][] {
+  const [y, m] = yearMonth.split("-").map(Number);
+  const firstOfMonth = new Date(y, m - 1, 1);
+  const startWeekday = firstOfMonth.getDay();
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const gridStart = new Date(y, m - 1, 1 - startWeekday);
+  const totalCells = Math.ceil((startWeekday + daysInMonth) / 7) * 7;
+
+  const cells = Array.from({ length: totalCells }, (_, i) => {
+    const d = new Date(gridStart);
+    d.setDate(gridStart.getDate() + i);
+    return { date: d, iso: isoOf(d), inMonth: d.getMonth() === m - 1 && d.getFullYear() === y };
+  });
+
+  const weeks: (typeof cells)[] = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+  return weeks;
+}
+
 export default function DashboardPage() {
   const [yearMonth, setYearMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -44,7 +71,10 @@ export default function DashboardPage() {
         const r = await fetch(`/api/dashboard?month=${yearMonth}`);
         if (!r.ok) throw new Error(`載入失敗(${r.status})`);
         const json = await r.json();
-        if (!cancelled) setData(json);
+        if (!cancelled) {
+          setData(json);
+          setSelectedDay(json.calendar.some((c: CalendarItem) => c.日期 === json.today) ? json.today : null);
+        }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
       } finally {
@@ -65,8 +95,10 @@ export default function DashboardPage() {
       arr.push(item);
       map.set(item.日期, arr);
     }
-    return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
+    return map;
   }, [data]);
+
+  const weeks = useMemo(() => buildMonthGrid(yearMonth), [yearMonth]);
 
   const donePct = data && data.completion.total > 0
     ? Math.round(((data.completion.byStatus["已交付"] ?? 0) / data.completion.total) * 100)
@@ -96,7 +128,7 @@ export default function DashboardPage() {
 
       {data && (
         <section className="border border-black/10 dark:border-white/15 rounded-lg p-4">
-          <h2 className="font-medium mb-3">完成度儀表(本月建立的 Session,共 {data.completion.total} 筆)</h2>
+          <h2 className="font-medium mb-3">完成度儀表(本月有對應日期任務的 Session,共 {data.completion.total} 筆)</h2>
           <div className="w-full h-3 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden mb-3">
             <div className="h-full bg-green-600" style={{ width: `${donePct}%` }} />
           </div>
@@ -125,20 +157,66 @@ export default function DashboardPage() {
 
       {data && (
         <section className="border border-black/10 dark:border-white/15 rounded-lg p-4">
-          <h2 className="font-medium mb-3">行事曆(依日期排列)</h2>
-          {byDay.length === 0 && <p className="text-sm text-zinc-500">本月尚無任務節點。</p>}
-          <div className="flex flex-col gap-4">
-            {byDay.map(([day, items]) => (
-              <div key={day}>
-                <div className="text-sm font-semibold mb-1">{day}</div>
-                <ul className="flex flex-col gap-1">
-                  {items.map((t) => (
-                    <TaskRow key={t.id} item={t} />
-                  ))}
-                </ul>
+          <h2 className="font-medium mb-3">行事曆</h2>
+          <div className="grid grid-cols-7 gap-1 text-center text-xs text-zinc-500 mb-1">
+            {WEEKDAY_LABELS.map((w) => (
+              <div key={w}>{w}</div>
+            ))}
+          </div>
+          <div className="flex flex-col gap-1">
+            {weeks.map((week, wi) => (
+              <div key={wi} className="grid grid-cols-7 gap-1">
+                {week.map((cell) => {
+                  const items = byDay.get(cell.iso) ?? [];
+                  const isToday = cell.iso === data.today;
+                  const isSelected = cell.iso === selectedDay;
+                  return (
+                    <button
+                      key={cell.iso}
+                      onClick={() => setSelectedDay(cell.iso)}
+                      className={[
+                        "min-h-16 sm:min-h-20 rounded border p-1 text-left align-top flex flex-col gap-0.5 overflow-hidden",
+                        cell.inMonth
+                          ? "border-black/10 dark:border-white/15"
+                          : "border-transparent opacity-35",
+                        isSelected ? "ring-2 ring-blue-500" : "",
+                        isToday ? "bg-blue-50 dark:bg-blue-950" : "",
+                      ].join(" ")}
+                    >
+                      <span className={`text-xs ${isToday ? "font-bold text-blue-700 dark:text-blue-300" : ""}`}>
+                        {cell.date.getDate()}
+                      </span>
+                      {items.slice(0, MAX_PREVIEW_PER_DAY).map((it) => (
+                        <span
+                          key={it.id}
+                          className="text-[10px] leading-tight truncate rounded bg-zinc-100 dark:bg-zinc-800 px-1"
+                        >
+                          {it.標題}
+                        </span>
+                      ))}
+                      {items.length > MAX_PREVIEW_PER_DAY && (
+                        <span className="text-[10px] text-zinc-500">+{items.length - MAX_PREVIEW_PER_DAY} 更多</span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             ))}
           </div>
+
+          {selectedDay && (
+            <div className="mt-4 border-t border-black/10 dark:border-white/15 pt-3">
+              <h3 className="text-sm font-semibold mb-2">{selectedDay}</h3>
+              {(byDay.get(selectedDay) ?? []).length === 0 && (
+                <p className="text-sm text-zinc-500">這天沒有任務節點。</p>
+              )}
+              <ul className="flex flex-col gap-1">
+                {(byDay.get(selectedDay) ?? []).map((t) => (
+                  <TaskRow key={t.id} item={t} />
+                ))}
+              </ul>
+            </div>
+          )}
         </section>
       )}
     </div>
