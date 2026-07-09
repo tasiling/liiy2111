@@ -8,6 +8,7 @@ import {
   readNumber,
   readDateStart,
   readRelationIds,
+  readUrl,
 } from "./properties";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -263,7 +264,8 @@ export async function getMonthlyThemeByMonth(monthKey: string) {
   return pages.length > 0 ? mapMonthlyTheme(pages[0]) : null;
 }
 
-// --- DB-14 知識庫:P8 組稿用,找語氣指引現行版(來源=原創,標題「語氣指引 vX」,取最新版) ---
+// --- DB-14 知識庫:P8 組稿用,找語氣指引現行版 ---
+// 讀取規則(擁有者 v1.5 補丁明訂):標題以「語氣指引」開頭、核可狀態=已核可,取最新版本筆。
 export function mapKnowledge(p: NotionPage) {
   return {
     id: p.id,
@@ -271,15 +273,51 @@ export function mapKnowledge(p: NotionPage) {
     內容: readRichText(p, "內容"),
     來源: readSelect(p, "來源"),
     核可狀態: readSelect(p, "核可狀態"),
+    連結: readUrl(p, "連結"),
   };
 }
 
 export async function listToneGuideCandidates() {
   const pages = await queryAll(DATA_SOURCES.DB14_知識庫, {
     and: [
-      { property: "來源", select: { equals: "原創" } },
       { property: "標題", title: { starts_with: "語氣指引" } },
+      { property: "核可狀態", select: { equals: "已核可" } },
     ],
   });
   return pages.map(mapKnowledge);
+}
+
+// --- 讀取一般 Notion 頁面內容為純文字(用於語氣指引「連結」指向另一頁全文的情況) ---
+// Notion 網址常見兩種 ID 格式:瀏覽器分享連結多為 32 碼無 dash 的十六進位字串;
+// 部分工具(含本專案的 Notion 連接器)回傳的 URL 則帶 dash 的 UUID 格式,兩種都要能解析。
+export function extractNotionPageId(url: string): string | null {
+  const dashed = url.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+  if (dashed) return dashed[0];
+  const plain = url.match(/[0-9a-f]{32}/i);
+  return plain ? plain[0] : null;
+}
+
+export async function fetchNotionPagePlainText(pageId: string): Promise<string> {
+  async function walk(blockId: string): Promise<string[]> {
+    const lines: string[] = [];
+    let cursor: string | undefined = undefined;
+    do {
+      const res = await withNotionRateLimit(() =>
+        notion().blocks.children.list({ block_id: blockId, start_cursor: cursor, page_size: 100 })
+      );
+      for (const block of res.results as NotionPage[]) {
+        const richText = block[block.type]?.rich_text;
+        if (Array.isArray(richText)) {
+          const text = richText.map((t: { plain_text: string }) => t.plain_text).join("");
+          if (text) lines.push(text);
+        }
+        if (block.has_children) {
+          lines.push(...(await walk(block.id)));
+        }
+      }
+      cursor = res.has_more ? (res.next_cursor ?? undefined) : undefined;
+    } while (cursor);
+    return lines;
+  }
+  return (await walk(pageId)).join("\n");
 }

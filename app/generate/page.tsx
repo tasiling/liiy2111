@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 
 type SessionRow = {
   id: string;
@@ -19,6 +19,45 @@ type DetailRow = {
 
 type MonthlyTheme = { id: string; 月份: string; 主題名: string };
 
+type SharedContext = {
+  規則代碼: string;
+  牌位定義: string;
+  解讀邏輯: string;
+  輸出格式: string;
+  theme: { 月份: string; 主題名: string; 深度討論題目: string; 每日互動方向: string; 當月三款主題服務: string } | null;
+  語氣指引標題: string;
+  語氣指引內容: string;
+};
+
+type DetailCardResult =
+  | { ok: true; 明細編號: string; 對應日期: string | null; cardsSection: string }
+  | { ok: false; 明細編號: string; 對應日期: string | null; missing: string[] };
+
+function buildSharedFooter(ctx: SharedContext): string[] {
+  const themeSection = ctx.theme
+    ? [
+        "",
+        `【本月主題包(${ctx.theme.月份}${ctx.theme.主題名 ? " " + ctx.theme.主題名 : ""})】`,
+        `深度討論題目:${ctx.theme.深度討論題目}`,
+        `每日互動方向:${ctx.theme.每日互動方向}`,
+        `當月三款主題服務:${ctx.theme.當月三款主題服務}`,
+      ]
+    : [];
+  return [
+    "",
+    `【解讀規則(${ctx.規則代碼},現行版)】`,
+    `牌位定義:${ctx.牌位定義}`,
+    `解讀邏輯:${ctx.解讀邏輯}`,
+    ...themeSection,
+    "",
+    `【語氣指引(${ctx.語氣指引標題})】`,
+    ctx.語氣指引內容,
+    "",
+    "【輸出格式】",
+    ctx.輸出格式,
+  ];
+}
+
 export default function GeneratePage() {
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [themes, setThemes] = useState<MonthlyTheme[]>([]);
@@ -26,10 +65,21 @@ export default function GeneratePage() {
   const [details, setDetails] = useState<DetailRow[]>([]);
   const [detailId, setDetailId] = useState("");
   const [monthKey, setMonthKey] = useState(() => new Date().toISOString().slice(0, 7));
+
+  // 單篇組稿(模式=單筆)
   const [prompt, setPrompt] = useState<string | null>(null);
   const [missing, setMissing] = useState<string[] | null>(null);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // 批次組稿(模式=批次,v1.5 補丁)
+  const [batchMode, setBatchMode] = useState<"甲" | "乙">("甲");
+  const [batchMissing, setBatchMissing] = useState<string[] | null>(null);
+  const [batchLoading, setBatchLoading] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<{ done: number; total: number } | null>(null);
+  const [sharedContext, setSharedContext] = useState<SharedContext | null>(null);
+  const [batchResults, setBatchResults] = useState<DetailCardResult[] | null>(null);
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
 
   useEffect(() => {
     fetch("/api/sessions")
@@ -41,11 +91,17 @@ export default function GeneratePage() {
   }, []);
 
   const selectedSession = sessions.find((s) => s.id === sessionId);
+  const isBatch = selectedSession?.模式 === "批次";
 
   async function handleSessionChange(newId: string) {
     setSessionId(newId);
     setDetailId("");
     setDetails([]);
+    setPrompt(null);
+    setMissing(null);
+    setSharedContext(null);
+    setBatchResults(null);
+    setBatchMissing(null);
     const session = sessions.find((s) => s.id === newId);
     if (newId && session?.模式 === "批次") {
       const res = await fetch(`/api/sessions/${newId}/details`);
@@ -54,7 +110,7 @@ export default function GeneratePage() {
     }
   }
 
-  async function compose() {
+  async function composeSingle() {
     setLoading(true);
     setPrompt(null);
     setMissing(null);
@@ -63,11 +119,7 @@ export default function GeneratePage() {
       const res = await fetch("/api/generate/compose", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sessionId,
-          detailId: detailId || undefined,
-          monthKey,
-        }),
+        body: JSON.stringify({ sessionId, detailId: detailId || undefined, monthKey }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) {
@@ -86,12 +138,80 @@ export default function GeneratePage() {
     setCopied(true);
   }
 
+  async function runBatchCompose() {
+    setBatchLoading(true);
+    setBatchMissing(null);
+    setSharedContext(null);
+    setBatchResults(null);
+    setBatchProgress({ done: 0, total: details.length });
+    try {
+      const ctxRes = await fetch("/api/generate/context", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId, monthKey }),
+      });
+      const ctxData = await ctxRes.json();
+      if (!ctxRes.ok || !ctxData.ok) {
+        setBatchMissing(ctxData.missing ?? [ctxData.error ?? "組稿失敗"]);
+        return;
+      }
+      setSharedContext(ctxData);
+
+      // 逐筆取牌卡資料(遵守速率限制,同時讓使用者看到「第 N/M 筆」進度)。
+      const results: DetailCardResult[] = [];
+      for (const d of details) {
+        const r = await fetch(`/api/generate/detail-cards?detailId=${d.id}`);
+        const data = await r.json();
+        results.push(data);
+        setBatchProgress({ done: results.length, total: details.length });
+      }
+      setBatchResults(results);
+    } finally {
+      setBatchLoading(false);
+    }
+  }
+
+  const successResults = useMemo(
+    () => (batchResults ?? []).filter((r): r is Extract<DetailCardResult, { ok: true }> => r.ok),
+    [batchResults]
+  );
+  const failedResults = useMemo(
+    () => (batchResults ?? []).filter((r): r is Extract<DetailCardResult, { ok: false }> => !r.ok),
+    [batchResults]
+  );
+
+  const combinedPrompt = useMemo(() => {
+    if (!sharedContext || successResults.length === 0) return null;
+    return [
+      `【本批任務:共 ${successResults.length} 篇】`,
+      ...successResults.flatMap((r) => [`日期:${r.對應日期}`, r.cardsSection, ""]),
+      ...buildSharedFooter(sharedContext),
+      "",
+      `請依上列 ${successResults.length} 個日期分別產出 ${successResults.length} 篇,每篇獨立完整,依輸出格式分頁。`,
+    ].join("\n");
+  }, [sharedContext, successResults]);
+
+  const separatePrompts = useMemo(() => {
+    if (!sharedContext) return [];
+    return successResults.map((r) => ({
+      label: `${r.對應日期}`,
+      prompt: [`【${r.對應日期}】`, "", "【牌卡資料】", r.cardsSection, ...buildSharedFooter(sharedContext)].join(
+        "\n"
+      ),
+    }));
+  }, [sharedContext, successResults]);
+
+  async function copyText(text: string, idx: number) {
+    await navigator.clipboard.writeText(text);
+    setCopiedIdx(idx);
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-lg font-semibold">P8 生成工作台 — 階段一・一鍵組稿</h1>
       <p className="text-sm text-zinc-500">
         自動組裝五項輸入(牌卡資料、對應規則現行版、月主題包、語氣指引現行版、輸出格式)成完整提示詞,複製後貼入任何 AI
-        對話生成。純讀取,不寫入 Notion,零 API 成本。五項缺一即報錯,不會靜默省略。
+        對話生成。純讀取,不寫入 Notion,零 API 成本。缺一律報錯,不會靜默省略。
       </p>
 
       <section className="border border-black/10 dark:border-white/15 rounded-lg p-4 flex flex-col gap-3 text-sm">
@@ -111,24 +231,6 @@ export default function GeneratePage() {
           </select>
         </label>
 
-        {selectedSession?.模式 === "批次" && (
-          <label className="flex flex-col gap-1">
-            明細(批次 Session 需指定要組哪一天)
-            <select
-              className="border rounded px-2 py-1 bg-transparent"
-              value={detailId}
-              onChange={(e) => setDetailId(e.target.value)}
-            >
-              <option value="">請選擇明細…</option>
-              {details.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.明細編號}({d.對應日期}){d.抽出順序 ? ` — ${d.抽出順序}` : "(尚未抽牌)"}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-
         <label className="flex flex-col gap-1">
           月主題包
           <select
@@ -136,7 +238,7 @@ export default function GeneratePage() {
             value={monthKey}
             onChange={(e) => setMonthKey(e.target.value)}
           >
-            <option value={monthKey}>{monthKey}(當前月,若無對應月主題包會報錯)</option>
+            <option value={monthKey}>{monthKey}(當前月,若無對應月主題包且非大眾占卜會報錯)</option>
             {themes
               .filter((t) => t.月份 !== monthKey)
               .map((t) => (
@@ -147,13 +249,67 @@ export default function GeneratePage() {
           </select>
         </label>
 
-        <button
-          disabled={!sessionId || loading}
-          onClick={compose}
-          className="self-start px-3 py-1.5 rounded bg-foreground text-background text-sm disabled:opacity-50"
-        >
-          {loading ? "組裝中…" : "組裝提示詞"}
-        </button>
+        {!isBatch && (
+          <>
+            {sessionId && (
+              <label className="flex flex-col gap-1">
+                明細(單筆 Session 只有一筆,自動取用;此欄僅供確認)
+                <select
+                  className="border rounded px-2 py-1 bg-transparent"
+                  value={detailId}
+                  onChange={(e) => setDetailId(e.target.value)}
+                >
+                  <option value="">自動取用唯一明細</option>
+                  {details.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.明細編號}({d.對應日期}){d.抽出順序 ? ` — ${d.抽出順序}` : "(尚未抽牌)"}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <button
+              disabled={!sessionId || loading}
+              onClick={composeSingle}
+              className="self-start px-3 py-1.5 rounded bg-foreground text-background text-sm disabled:opacity-50"
+            >
+              {loading ? "組裝中…" : "組裝提示詞"}
+            </button>
+          </>
+        )}
+
+        {isBatch && (
+          <>
+            <div className="flex items-center gap-3">
+              <span>組稿模式:</span>
+              <label className="flex items-center gap-1">
+                <input
+                  type="radio"
+                  checked={batchMode === "甲"}
+                  onChange={() => setBatchMode("甲")}
+                />
+                模式甲・整批一稿(同規則批次預設)
+              </label>
+              <label className="flex items-center gap-1">
+                <input
+                  type="radio"
+                  checked={batchMode === "乙"}
+                  onChange={() => setBatchMode("乙")}
+                />
+                模式乙・逐篇分稿
+              </label>
+            </div>
+            <button
+              disabled={!sessionId || batchLoading || details.length === 0}
+              onClick={runBatchCompose}
+              className="self-start px-3 py-1.5 rounded bg-foreground text-background text-sm disabled:opacity-50"
+            >
+              {batchLoading
+                ? `讀取中…(${batchProgress?.done ?? 0}/${batchProgress?.total ?? details.length})`
+                : `開始批次組稿(共 ${details.length} 筆明細)`}
+            </button>
+          </>
+        )}
       </section>
 
       {missing && (
@@ -183,6 +339,78 @@ export default function GeneratePage() {
             value={prompt}
             className="w-full h-96 text-xs font-mono border rounded p-2 bg-transparent"
           />
+        </section>
+      )}
+
+      {batchMissing && (
+        <section className="border border-red-300 dark:border-red-800 rounded-lg p-4 text-sm">
+          <h2 className="font-medium mb-2 text-red-700 dark:text-red-400">缺少以下項目,無法批次組稿:</h2>
+          <ul className="list-disc list-inside text-red-700 dark:text-red-400">
+            {batchMissing.map((m, i) => (
+              <li key={i}>{m}</li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {failedResults.length > 0 && (
+        <section className="border border-orange-300 dark:border-orange-800 rounded-lg p-4 text-sm">
+          <h2 className="font-medium mb-2 text-orange-700 dark:text-orange-400">
+            以下 {failedResults.length} 筆未能取得牌卡資料,不列入本次提示詞:
+          </h2>
+          <ul className="list-disc list-inside text-orange-700 dark:text-orange-400">
+            {failedResults.map((r) => (
+              <li key={r.明細編號}>
+                {r.明細編號}({r.對應日期}):{r.missing.join("、")}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {sharedContext && batchMode === "甲" && combinedPrompt && (
+        <section className="border border-black/10 dark:border-white/15 rounded-lg p-4">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="font-medium">整批一稿(共 {successResults.length} 篇)</h2>
+            <button
+              onClick={() => copyText(combinedPrompt, -1)}
+              className="px-3 py-1 rounded border border-black/15 dark:border-white/20 text-xs"
+            >
+              {copiedIdx === -1 ? "已複製" : "複製"}
+            </button>
+          </div>
+          <textarea
+            readOnly
+            value={combinedPrompt}
+            className="w-full h-96 text-xs font-mono border rounded p-2 bg-transparent"
+          />
+        </section>
+      )}
+
+      {sharedContext && batchMode === "乙" && separatePrompts.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <h2 className="font-medium text-sm">逐篇分稿(共 {separatePrompts.length} 篇,各自獨立複製)</h2>
+          {separatePrompts.map((p, i) => (
+            <details key={i} className="border border-black/10 dark:border-white/15 rounded-lg p-4">
+              <summary className="flex items-center justify-between cursor-pointer">
+                <span className="font-medium text-sm">{p.label}</span>
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    copyText(p.prompt, i);
+                  }}
+                  className="px-3 py-1 rounded border border-black/15 dark:border-white/20 text-xs"
+                >
+                  {copiedIdx === i ? "已複製" : "複製"}
+                </button>
+              </summary>
+              <textarea
+                readOnly
+                value={p.prompt}
+                className="w-full h-72 text-xs font-mono border rounded p-2 mt-2 bg-transparent"
+              />
+            </details>
+          ))}
         </section>
       )}
     </div>
