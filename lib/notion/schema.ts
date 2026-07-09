@@ -63,6 +63,18 @@ export const EVENT_STATUS = ["啟用", "停用"] as const;
 // DB-15 場次表狀態
 export const SESSION_SLOT_STATUS = ["預定", "已完成"] as const;
 
+// DB-05 解讀規則庫「適用項目」(v2.5:六項擴為七項,新增服務導流占卜)
+export const RULE_適用項目 = [
+  "能量流",
+  "大眾占卜",
+  "心理測驗",
+  "邀請文",
+  "個人心得",
+  "事件序列文",
+  "服務導流占卜",
+] as const;
+export const RULE_STATUS = ["現行", "舊版", "待審"] as const;
+
 // DB-09 回饋紀錄:四維評分欄位與範圍(Notion 端無法強制,App 端必須驗證 1–5)
 export const FEEDBACK_SCORE_FIELDS = ["準確度", "語感", "轉換效果", "可複用性"] as const;
 export const FEEDBACK_SCORE_MIN = 1;

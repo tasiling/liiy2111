@@ -39,6 +39,9 @@ export default function RootLayout({
           <Link href="/expand" className="font-medium hover:underline">
             序列展開
           </Link>
+          <Link href="/generate" className="font-medium hover:underline">
+            P8 組稿
+          </Link>
         </nav>
         <main className="flex-1 p-4 max-w-3xl w-full mx-auto">{children}</main>
       </body>

@@ -52,15 +52,25 @@ export async function listDecks() {
   }));
 }
 
-// --- DB-02 牌卡表:依識別碼(如 MP-15)查單張卡,用於抽牌輸入驗證 ---
+// --- DB-02 牌卡表:依識別碼(如 MP-15)查單張卡,用於抽牌輸入驗證與 P8 組稿 ---
+export function mapCard(p: NotionPage) {
+  return {
+    id: p.id,
+    卡片識別碼: readTitle(p, "卡片識別碼"),
+    牌名: readRichText(p, "牌名"),
+    短義: readRichText(p, "短義"),
+    長義: readRichText(p, "長義"),
+    關鍵字: readMultiSelect(p, "關鍵字"),
+  };
+}
+
 export async function findCardByIdentifier(identifier: string) {
   const pages = await queryAll(DATA_SOURCES.DB02_牌卡表, {
     property: "卡片識別碼",
     title: { equals: identifier },
   });
   if (pages.length === 0) return null;
-  const p = pages[0];
-  return { id: p.id, 卡片識別碼: readTitle(p, "卡片識別碼"), 牌名: readRichText(p, "牌名") };
+  return mapCard(pages[0]);
 }
 
 // --- DB-03 抽牌 Session ---
@@ -108,6 +118,11 @@ export async function listDetailsForSession(sessionId: string) {
     relation: { contains: sessionId },
   });
   return pages.map(mapDetail).sort((a, b) => a.明細編號.localeCompare(b.明細編號));
+}
+
+export async function getDetail(detailId: string) {
+  const p = await withNotionRateLimit(() => notion().pages.retrieve({ page_id: detailId }));
+  return mapDetail(p as NotionPage);
 }
 
 export async function listDetailsInRange(startISO: string, endISO: string) {
@@ -196,4 +211,75 @@ export async function listSlotsInRange(startISO: string, endISO: string) {
     ],
   });
   return pages.map(mapSlot);
+}
+
+// --- DB-05 解讀規則庫:P8 組稿用,找「適用項目」對應的現行版規則 ---
+export function mapRule(p: NotionPage) {
+  return {
+    id: p.id,
+    規則代碼: readTitle(p, "規則代碼"),
+    規則名稱: readRichText(p, "規則名稱"),
+    適用項目: readSelect(p, "適用項目"),
+    狀態: readSelect(p, "狀態"),
+    牌位定義: readRichText(p, "牌位定義"),
+    解讀邏輯: readRichText(p, "解讀邏輯"),
+    輸出格式: readRichText(p, "輸出格式"),
+    版本號: readNumber(p, "版本號"),
+  };
+}
+
+export async function listCurrentRulesFor適用項目(適用項目: string) {
+  const pages = await queryAll(DATA_SOURCES.DB05_解讀規則庫, {
+    and: [
+      { property: "適用項目", select: { equals: 適用項目 } },
+      { property: "狀態", select: { equals: "現行" } },
+    ],
+  });
+  return pages.map(mapRule);
+}
+
+// --- DB-08 月主題包:P8 組稿用 ---
+export function mapMonthlyTheme(p: NotionPage) {
+  return {
+    id: p.id,
+    月份: readTitle(p, "月份"),
+    主題名: readRichText(p, "主題名"),
+    深度討論題目: readRichText(p, "深度討論題目"),
+    每日互動方向: readRichText(p, "每日互動方向"),
+    當月三款主題服務: readRichText(p, "當月三款主題服務"),
+  };
+}
+
+export async function listMonthlyThemes() {
+  const pages = await queryAll(DATA_SOURCES.DB08_月主題包);
+  return pages.map(mapMonthlyTheme).sort((a, b) => b.月份.localeCompare(a.月份));
+}
+
+export async function getMonthlyThemeByMonth(monthKey: string) {
+  const pages = await queryAll(DATA_SOURCES.DB08_月主題包, {
+    property: "月份",
+    title: { equals: monthKey },
+  });
+  return pages.length > 0 ? mapMonthlyTheme(pages[0]) : null;
+}
+
+// --- DB-14 知識庫:P8 組稿用,找語氣指引現行版(來源=原創,標題「語氣指引 vX」,取最新版) ---
+export function mapKnowledge(p: NotionPage) {
+  return {
+    id: p.id,
+    標題: readTitle(p, "標題"),
+    內容: readRichText(p, "內容"),
+    來源: readSelect(p, "來源"),
+    核可狀態: readSelect(p, "核可狀態"),
+  };
+}
+
+export async function listToneGuideCandidates() {
+  const pages = await queryAll(DATA_SOURCES.DB14_知識庫, {
+    and: [
+      { property: "來源", select: { equals: "原創" } },
+      { property: "標題", title: { starts_with: "語氣指引" } },
+    ],
+  });
+  return pages.map(mapKnowledge);
 }
