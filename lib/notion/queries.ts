@@ -110,6 +110,7 @@ export function mapDetail(p: NotionPage) {
     對應日期: readDateStart(p, "對應日期"),
     抽出順序: readRichText(p, "抽出順序"),
     所屬Session: readRelationIds(p, "所屬 Session")[0] ?? null,
+    明細狀態: readSelect(p, "明細狀態"),
   };
 }
 
@@ -283,6 +284,15 @@ export async function listToneGuideCandidates() {
       { property: "標題", title: { starts_with: "語氣指引" } },
       { property: "核可狀態", select: { equals: "已核可" } },
     ],
+  });
+  return pages.map(mapKnowledge);
+}
+
+// P8-0(委派書 v1.6):服務導流占卜配對表候選——只取已核可者,App 只撈料不代選。
+export async function listApprovedKnowledgeEntries() {
+  const pages = await queryAll(DATA_SOURCES.DB14_知識庫, {
+    property: "核可狀態",
+    select: { equals: "已核可" },
   });
   return pages.map(mapKnowledge);
 }

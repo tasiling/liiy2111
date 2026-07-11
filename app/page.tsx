@@ -16,12 +16,18 @@ type CalendarItem = {
 type DashboardData = {
   yearMonth: string;
   calendar: CalendarItem[];
-  completion: { total: number; byStatus: Record<string, number> };
+  completion: {
+    total: number;
+    done: number;
+    single: { total: number; byStatus: Record<string, number> };
+    batch: { total: number; byStatus: Record<string, number> };
+  };
   today: string;
   todayTasks: CalendarItem[];
 };
 
 const STATUS_ORDER = ["已抽牌", "已指定用途", "解讀中", "已產出", "已交付"];
+const DETAIL_STATUS_ORDER = ["待產出", "已產出", "已交付"];
 const WEEKDAY_LABELS = ["日", "一", "二", "三", "四", "五", "六"];
 const MAX_PREVIEW_PER_DAY = 2;
 
@@ -101,7 +107,7 @@ export default function DashboardPage() {
   const weeks = useMemo(() => buildMonthGrid(yearMonth), [yearMonth]);
 
   const donePct = data && data.completion.total > 0
-    ? Math.round(((data.completion.byStatus["已交付"] ?? 0) / data.completion.total) * 100)
+    ? Math.round((data.completion.done / data.completion.total) * 100)
     : 0;
 
   return (
@@ -128,14 +134,32 @@ export default function DashboardPage() {
 
       {data && (
         <section className="border border-black/10 dark:border-white/15 rounded-lg p-4">
-          <h2 className="font-medium mb-3">完成度儀表(本月有對應日期任務的 Session,共 {data.completion.total} 筆)</h2>
-          <div className="w-full h-3 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden mb-3">
+          <h2 className="font-medium mb-3">
+            完成度儀表(本月共 {data.completion.total} 項,已交付 {data.completion.done} 項)
+          </h2>
+          <div className="w-full h-3 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden mb-4">
             <div className="h-full bg-green-600" style={{ width: `${donePct}%` }} />
           </div>
-          <div className="grid grid-cols-5 gap-2 text-xs text-center">
+
+          <h3 className="text-xs font-medium text-zinc-500 mb-2">
+            單筆 Session(依 DB-03 狀態機,共 {data.completion.single.total} 筆)
+          </h3>
+          <div className="grid grid-cols-5 gap-2 text-xs text-center mb-4">
             {STATUS_ORDER.map((s) => (
               <div key={s}>
-                <div className="font-semibold">{data.completion.byStatus[s] ?? 0}</div>
+                <div className="font-semibold">{data.completion.single.byStatus[s] ?? 0}</div>
+                <div className="text-zinc-500">{s}</div>
+              </div>
+            ))}
+          </div>
+
+          <h3 className="text-xs font-medium text-zinc-500 mb-2">
+            批次 Session 明細(依 DB-04 明細狀態,共 {data.completion.batch.total} 筆)
+          </h3>
+          <div className="grid grid-cols-3 gap-2 text-xs text-center">
+            {DETAIL_STATUS_ORDER.map((s) => (
+              <div key={s}>
+                <div className="font-semibold">{data.completion.batch.byStatus[s] ?? 0}</div>
                 <div className="text-zinc-500">{s}</div>
               </div>
             ))}

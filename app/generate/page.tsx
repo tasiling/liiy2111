@@ -1,6 +1,10 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
+import { buildP8ZeroSection, type ServiceDivinationChoice } from "@/lib/generate/p8zero";
+import { SEVEN_METHODS } from "@/lib/notion/schema";
+
+type ServiceDivinationEntry = ServiceDivinationChoice & { id: string };
 
 type SessionRow = {
   id: string;
@@ -81,6 +85,15 @@ export default function GeneratePage() {
   const [batchResults, setBatchResults] = useState<DetailCardResult[] | null>(null);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
 
+  // P8-0 組稿選項表單(委派書 v1.6):封面 + 維度/方法(僅心理測驗) + 備註。
+  // 這裡的值只組進提示詞,不寫入任何資料庫。
+  const [coverText, setCoverText] = useState("");
+  const [coverCanvaCode, setCoverCanvaCode] = useState("");
+  const [note, setNote] = useState("");
+  const [sdCandidates, setSdCandidates] = useState<ServiceDivinationEntry[]>([]);
+  const [selectedSdId, setSelectedSdId] = useState("");
+  const [selectedMethod, setSelectedMethod] = useState("");
+
   useEffect(() => {
     fetch("/api/sessions")
       .then((r) => r.json())
@@ -92,6 +105,19 @@ export default function GeneratePage() {
 
   const selectedSession = sessions.find((s) => s.id === sessionId);
   const isBatch = selectedSession?.模式 === "批次";
+  const isPsychTest = selectedSession?.項目用途 === "心理測驗";
+  const selectedSd = sdCandidates.find((c) => c.id === selectedSdId) ?? null;
+  const p8zero = useMemo(
+    () => ({
+      coverText: coverText || undefined,
+      coverCanvaCode: coverCanvaCode || undefined,
+      note: note || undefined,
+      serviceDivination: selectedSd
+        ? { ...selectedSd, 方法: selectedMethod || selectedSd.方法 }
+        : null,
+    }),
+    [coverText, coverCanvaCode, note, selectedSd, selectedMethod]
+  );
 
   async function handleSessionChange(newId: string) {
     setSessionId(newId);
@@ -102,11 +128,18 @@ export default function GeneratePage() {
     setSharedContext(null);
     setBatchResults(null);
     setBatchMissing(null);
+    setSelectedSdId("");
+    setSelectedMethod("");
     const session = sessions.find((s) => s.id === newId);
     if (newId && session?.模式 === "批次") {
       const res = await fetch(`/api/sessions/${newId}/details`);
       const d = await res.json();
       setDetails(d.details ?? []);
+    }
+    if (newId && session?.項目用途 === "心理測驗" && sdCandidates.length === 0) {
+      const res = await fetch("/api/generate/service-divination");
+      const d = await res.json();
+      setSdCandidates(d.candidates ?? []);
     }
   }
 
@@ -119,7 +152,7 @@ export default function GeneratePage() {
       const res = await fetch("/api/generate/compose", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, detailId: detailId || undefined, monthKey }),
+        body: JSON.stringify({ sessionId, detailId: detailId || undefined, monthKey, p8zero }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) {
@@ -186,20 +219,26 @@ export default function GeneratePage() {
       `【本批任務:共 ${successResults.length} 篇】`,
       ...successResults.flatMap((r) => [`日期:${r.對應日期}`, r.cardsSection, ""]),
       ...buildSharedFooter(sharedContext),
+      ...buildP8ZeroSection(p8zero),
       "",
       `請依上列 ${successResults.length} 個日期分別產出 ${successResults.length} 篇,每篇獨立完整,依輸出格式分頁。`,
     ].join("\n");
-  }, [sharedContext, successResults]);
+  }, [sharedContext, successResults, p8zero]);
 
   const separatePrompts = useMemo(() => {
     if (!sharedContext) return [];
     return successResults.map((r) => ({
       label: `${r.對應日期}`,
-      prompt: [`【${r.對應日期}】`, "", "【牌卡資料】", r.cardsSection, ...buildSharedFooter(sharedContext)].join(
-        "\n"
-      ),
+      prompt: [
+        `【${r.對應日期}】`,
+        "",
+        "【牌卡資料】",
+        r.cardsSection,
+        ...buildSharedFooter(sharedContext),
+        ...buildP8ZeroSection(p8zero),
+      ].join("\n"),
     }));
-  }, [sharedContext, successResults]);
+  }, [sharedContext, successResults, p8zero]);
 
   async function copyText(text: string, idx: number) {
     await navigator.clipboard.writeText(text);
@@ -248,6 +287,81 @@ export default function GeneratePage() {
               ))}
           </select>
         </label>
+
+        {sessionId && (
+          <div className="border border-black/10 dark:border-white/15 rounded-lg p-3 flex flex-col gap-2">
+            <span className="text-xs font-medium text-zinc-500">P8-0 組稿選項(只組進提示詞,不寫入 Notion)</span>
+            <div className="flex flex-wrap gap-2">
+              <label className="flex flex-col gap-1 flex-1 min-w-40">
+                封面文字描述(選填)
+                <input
+                  className="border rounded px-2 py-1 bg-transparent"
+                  value={coverText}
+                  onChange={(e) => setCoverText(e.target.value)}
+                  placeholder="留空則提示詞明示「封面未指定」"
+                />
+              </label>
+              <label className="flex flex-col gap-1 flex-1 min-w-40">
+                封面 Canva 模板編號(選填)
+                <input
+                  className="border rounded px-2 py-1 bg-transparent"
+                  value={coverCanvaCode}
+                  onChange={(e) => setCoverCanvaCode(e.target.value)}
+                />
+              </label>
+            </div>
+
+            {isPsychTest && (
+              <div className="flex flex-wrap gap-2 items-end">
+                <label className="flex flex-col gap-1 flex-1 min-w-48">
+                  維度/方法(心理測驗候選服務,App 只列清單不代選)
+                  <select
+                    className="border rounded px-2 py-1 bg-transparent"
+                    value={selectedSdId}
+                    onChange={(e) => {
+                      setSelectedSdId(e.target.value);
+                      setSelectedMethod("");
+                    }}
+                  >
+                    <option value="">
+                      {sdCandidates.length === 0 ? "目前沒有已核可的候選服務" : "請選擇服務…"}
+                    </option>
+                    {sdCandidates.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.標題}(主維度:{c.主維度.join("、")})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {selectedSd && (
+                  <label className="flex flex-col gap-1">
+                    方法(預設值可換)
+                    <select
+                      className="border rounded px-2 py-1 bg-transparent"
+                      value={selectedMethod || selectedSd.方法}
+                      onChange={(e) => setSelectedMethod(e.target.value)}
+                    >
+                      {SEVEN_METHODS.map((m) => (
+                        <option key={m} value={m}>
+                          {m}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+              </div>
+            )}
+
+            <label className="flex flex-col gap-1">
+              其他臨場備註(選填,一行)
+              <input
+                className="border rounded px-2 py-1 bg-transparent"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+              />
+            </label>
+          </div>
+        )}
 
         {!isBatch && (
           <>

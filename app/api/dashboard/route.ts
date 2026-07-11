@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { listDetailsInRange, listSlotsInRange, getSession } from "@/lib/notion/queries";
-import { SESSION_STATUS_ORDER } from "@/lib/notion/schema";
+import { SESSION_STATUS_ORDER, DETAIL_STATUS_ORDER } from "@/lib/notion/schema";
 
 function monthRange(yearMonth: string): { start: string; end: string } {
   const [y, m] = yearMonth.split("-").map(Number);
@@ -54,14 +54,33 @@ export async function GET(req: NextRequest) {
 
   // 完成度按明細的「對應日期」歸月:一個 Session 只要在本月有對應日期的明細,就計入本月
   // (跨月批次會分別計入它涉及的每個月,不再用 Session「建立日期」歸月)。
-  const completion: Record<string, number> = Object.fromEntries(
+  //
+  // 委派書 v1.6:批次 Session 的實際生產進度以 DB-04「明細狀態」為準匯總;
+  // 單筆 Session 沿用 DB-03「狀態」狀態機。兩者刻度不同(3 階 vs 5 階),分開呈現。
+  const singleSessionStatus: Record<string, number> = Object.fromEntries(
     SESSION_STATUS_ORDER.map((s) => [s, 0])
   );
-  for (const id of uniqueSessionIds) {
-    const status = sessionMap.get(id)?.狀態;
-    if (status && status in completion) completion[status]++;
+  const batchDetailStatus: Record<string, number> = Object.fromEntries(
+    DETAIL_STATUS_ORDER.map((s) => [s, 0])
+  );
+  let singleTotal = 0;
+  let batchTotal = 0;
+
+  const countedSingleSessionIds = new Set<string>();
+  for (const d of details) {
+    const session = d.所屬Session ? sessionMap.get(d.所屬Session) : undefined;
+    if (!session) continue;
+    if (session.模式 === "批次") {
+      batchTotal++;
+      if (d.明細狀態 && d.明細狀態 in batchDetailStatus) batchDetailStatus[d.明細狀態]++;
+    } else if (session.模式 === "單筆" && !countedSingleSessionIds.has(session.id)) {
+      countedSingleSessionIds.add(session.id);
+      singleTotal++;
+      if (session.狀態 && session.狀態 in singleSessionStatus) singleSessionStatus[session.狀態]++;
+    }
   }
-  const total = uniqueSessionIds.length;
+  const total = singleTotal + batchTotal;
+  const done = (singleSessionStatus["已交付"] ?? 0) + (batchDetailStatus["已交付"] ?? 0);
 
   const todayTasks = [
     ...calendarFromDetails.filter((t) => t.日期 === today),
@@ -71,7 +90,12 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     yearMonth,
     calendar: [...calendarFromDetails, ...calendarFromSlots],
-    completion: { total, byStatus: completion },
+    completion: {
+      total,
+      done,
+      single: { total: singleTotal, byStatus: singleSessionStatus },
+      batch: { total: batchTotal, byStatus: batchDetailStatus },
+    },
     today,
     todayTasks,
   });

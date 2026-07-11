@@ -2,11 +2,13 @@
 // 五項輸入缺一即報錯,不得靜默省略(委派書 P8 規格硬規定)。
 import { getSession, getDetail, listDetailsForSession } from "@/lib/notion/queries";
 import { resolveCardsSection, resolveRule, resolveTheme, resolveToneGuide } from "./sections";
+import { buildP8ZeroSection, type P8ZeroInput } from "./p8zero";
 
 export type ComposeInput = {
   sessionId: string;
   detailId?: string;
   monthKey: string; // YYYY-MM
+  p8zero?: P8ZeroInput;
 };
 
 export type ComposeResult = { ok: true; prompt: string } | { ok: false; missing: string[] };
@@ -79,6 +81,7 @@ export async function composePrompt(input: ComposeInput): Promise<ComposeResult>
     "",
     "【輸出格式】",
     rule.輸出格式,
+    ...buildP8ZeroSection(input.p8zero ?? {}),
   ].join("\n");
 
   return { ok: true, prompt };
