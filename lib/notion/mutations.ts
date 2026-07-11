@@ -1,5 +1,12 @@
 import { notion, withNotionRateLimit } from "./client";
-import { DATA_SOURCES, SESSION_STATUS_ORDER, type SessionStatus } from "./schema";
+import {
+  DATA_SOURCES,
+  SESSION_STATUS_ORDER,
+  DETAIL_STATUS_ORDER,
+  DETAIL_STATUS_DEFAULT,
+  type SessionStatus,
+  type DetailStatus,
+} from "./schema";
 import { titleProp, richTextProp, selectProp, dateProp, relationProp } from "./properties";
 import { queryAll } from "./queries";
 import { readTitle } from "./properties";
@@ -39,6 +46,7 @@ export async function createSession(params: {
   return { id: page.id, code };
 }
 
+// 寫入驗證 10(委派書 v1.6):新建 DB-04 明細一律寫入明細狀態=待產出。
 export async function createDetail(params: {
   sessionId: string;
   sessionCode: string;
@@ -53,6 +61,7 @@ export async function createDetail(params: {
         明細編號: titleProp(明細編號),
         對應日期: dateProp(params.對應日期),
         "所屬 Session": relationProp([params.sessionId]),
+        明細狀態: selectProp(DETAIL_STATUS_DEFAULT),
       },
     })
   );
@@ -73,6 +82,7 @@ export async function createDetailWithTitle(params: {
         明細編號: titleProp(params.明細編號),
         對應日期: dateProp(params.對應日期),
         "所屬 Session": relationProp([params.sessionId]),
+        明細狀態: selectProp(DETAIL_STATUS_DEFAULT),
       },
     })
   );
@@ -117,6 +127,29 @@ export async function updateSessionStatus(sessionId: string, newStatus: SessionS
     notion().pages.update({
       page_id: sessionId,
       properties: { 狀態: selectProp(newStatus) },
+    })
+  );
+}
+
+// 明細狀態機(委派書 v1.6,寫入驗證 10):只允許順序推進,待產出→已產出→已交付。
+// 明細狀態只有三階,不像表頭狀態機那樣需要「跳步二次確認」的中間步驟夠多的情境,
+// 但仍套用同一套「只能往前一步」的收斂規則,不開放任意跳轉。
+export function canAdvanceDetailStatus(
+  current: DetailStatus,
+  next: DetailStatus
+): { ok: boolean; reason?: string } {
+  const curIdx = DETAIL_STATUS_ORDER.indexOf(current);
+  const nextIdx = DETAIL_STATUS_ORDER.indexOf(next);
+  if (curIdx === -1 || nextIdx === -1) return { ok: false, reason: "未知狀態" };
+  if (nextIdx <= curIdx) return { ok: false, reason: "只能往前推進,不可回退或停留" };
+  return { ok: true };
+}
+
+export async function updateDetailStatus(detailId: string, newStatus: DetailStatus) {
+  await withNotionRateLimit(() =>
+    notion().pages.update({
+      page_id: detailId,
+      properties: { 明細狀態: selectProp(newStatus) },
     })
   );
 }

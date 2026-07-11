@@ -10,7 +10,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "缺少必要參數:項目用途、date" }, { status: 400 });
   }
 
-  const session = await createSession({ dateISO: date, 項目用途, 模式: "單筆" });
+  // 「建立日期」= 這筆 Session 記錄實際被建立的那天(伺服器當下),與內容日期脫鉤,
+  // 理由同批次建立路由(見該檔案註解)。
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const session = await createSession({ dateISO: todayISO, 項目用途, 模式: "單筆" });
   const detail = await createDetail({
     sessionId: session.id,
     sessionCode: session.code,

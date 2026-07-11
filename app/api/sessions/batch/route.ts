@@ -18,7 +18,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "缺少必要參數:項目用途、startDate、days" }, { status: 400 });
   }
 
-  const session = await createSession({ dateISO: startDate, 項目用途, 模式: "批次" });
+  // 「建立日期」= 這筆 Session 記錄實際被建立的那天(伺服器當下),與批次內容的
+  // 起始日期脫鉤——內容日期已經獨立記在每筆明細的「對應日期」。startDate 若是未來
+  // 日期(如提前規劃下一批),不應該讓「建立日期」也跟著變成未來,否則會跑出「近期
+  // Session」清單的查詢區間(上界=今天),使用者重新整理也看不到剛建立的資料。
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const session = await createSession({ dateISO: todayISO, 項目用途, 模式: "批次" });
 
   const dates = Array.from({ length: days }, (_, i) => toISODate(addDays(new Date(startDate), i)));
   const result = await runBatch(

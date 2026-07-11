@@ -1,10 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { SESSION_STATUS_ORDER, SESSION_項目用途 } from "@/lib/notion/schema";
+import {
+  SESSION_STATUS_ORDER,
+  SESSION_項目用途,
+  DETAIL_STATUS_ORDER,
+  normalizeDetailStatus,
+  normalizeSessionStatus,
+} from "@/lib/notion/schema";
 
 const STATUS_ORDER: readonly string[] = SESSION_STATUS_ORDER;
 const 項目用途_OPTIONS: readonly string[] = SESSION_項目用途;
+const DETAIL_STATUSES: readonly string[] = DETAIL_STATUS_ORDER;
 
 type SessionRow = {
   id: string;
@@ -21,6 +28,7 @@ type DetailRow = {
   明細編號: string;
   對應日期: string | null;
   抽出順序: string;
+  明細狀態: string | null;
 };
 
 export default function SessionsPage() {
@@ -59,7 +67,7 @@ export default function SessionsPage() {
   }
 
   async function advanceStatus(session: SessionRow, newStatus: string) {
-    const curIdx = STATUS_ORDER.indexOf(session.狀態 ?? "");
+    const curIdx = STATUS_ORDER.indexOf(normalizeSessionStatus(session.狀態));
     const nextIdx = STATUS_ORDER.indexOf(newStatus);
     const isSkip = nextIdx > curIdx + 1;
     if (isSkip && !confirm(`「${newStatus}」跳過了中間步驟,確定要跳步嗎?`)) return;
@@ -96,7 +104,7 @@ export default function SessionsPage() {
                 <span className="text-xs text-zinc-500">{s.項目用途}</span>
                 <span className="text-xs text-zinc-500">{s.模式}</span>
                 <span className="text-xs px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800">
-                  {s.狀態}
+                  {normalizeSessionStatus(s.狀態)}
                 </span>
                 <select
                   className="ml-auto text-xs border rounded px-1 py-0.5 bg-transparent"
@@ -107,7 +115,7 @@ export default function SessionsPage() {
                   }}
                 >
                   <option value="">推進狀態…</option>
-                  {STATUS_ORDER.filter((st) => st !== s.狀態).map((st) => (
+                  {STATUS_ORDER.filter((st) => st !== normalizeSessionStatus(s.狀態)).map((st) => (
                     <option key={st} value={st}>
                       {st}
                     </option>
@@ -121,7 +129,29 @@ export default function SessionsPage() {
                 </button>
               </div>
               {expandedId === s.id && (
-                <DetailList details={details} decks={decks} onDrawn={() => refreshDetails(s.id)} />
+                <>
+                  <DetailList
+                    details={details}
+                    decks={decks}
+                    onDrawn={() => refreshDetails(s.id)}
+                    onStatusChanged={() => refreshDetails(s.id)}
+                  />
+                  {details.length > 0 &&
+                    details.every((d) => d.明細狀態 === "已交付") &&
+                    s.狀態 !== "已交付" && (
+                      <div className="mt-3 pt-3 border-t border-black/5 dark:border-white/10 text-sm flex items-center gap-2">
+                        <span className="text-green-700 dark:text-green-400">
+                          全數明細已交付。
+                        </span>
+                        <button
+                          onClick={() => advanceStatus(s, "已交付")}
+                          className="px-2 py-1 rounded bg-foreground text-background text-xs"
+                        >
+                          確認將 Session 狀態推進為「已交付」
+                        </button>
+                      </div>
+                    )}
+                </>
               )}
             </li>
           ))}
@@ -279,17 +309,121 @@ function DetailList({
   details,
   decks,
   onDrawn,
+  onStatusChanged,
 }: {
   details: DetailRow[];
   decks: Deck[];
   onDrawn: () => void;
+  onStatusChanged: () => void;
 }) {
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [batchTarget, setBatchTarget] = useState("");
+  const [batchMsg, setBatchMsg] = useState<string | null>(null);
+  const [batchSubmitting, setBatchSubmitting] = useState(false);
+
+  // 空值一律視同「待產出」(防禦性 fallback),不讓儀表/清單出現黑數;
+  // 推進動作照常寫入真值,舊資料重新整理後就會顯示真的狀態。
+  const summary: Record<string, number> = Object.fromEntries(DETAIL_STATUSES.map((s) => [s, 0]));
+  for (const d of details) {
+    summary[normalizeDetailStatus(d.明細狀態)]++;
+  }
+
+  // 多選批次推進:所選明細目前狀態須一致,才能明確知道「推進到下一步」是哪一步,
+  // 避免混合狀態時的跳步語意不清。
+  const selectedDetails = details.filter((d) => selected.has(d.id));
+  const selectedCurrentStatuses = new Set(selectedDetails.map((d) => normalizeDetailStatus(d.明細狀態)));
+  const uniformCurrent = selectedCurrentStatuses.size === 1 ? [...selectedCurrentStatuses][0] : null;
+  const nextForUniform =
+    uniformCurrent && DETAIL_STATUSES.includes(uniformCurrent)
+      ? DETAIL_STATUSES[DETAIL_STATUSES.indexOf(uniformCurrent) + 1]
+      : undefined;
+
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function applyBatch() {
+    if (!batchTarget || selected.size === 0) return;
+    setBatchSubmitting(true);
+    setBatchMsg(null);
+    try {
+      const res = await fetch("/api/details/batch-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ detailIds: [...selected], newStatus: batchTarget }),
+      });
+      const data = await res.json();
+      const failMsg = data.failed?.length ? `,${data.failed.length} 筆失敗:${data.failed.map((f: { error: string }) => f.error).join(";")}` : "";
+      setBatchMsg(`成功 ${data.succeeded?.length ?? 0} 筆${failMsg}`);
+      setSelected(new Set());
+      setBatchTarget("");
+      onStatusChanged();
+    } finally {
+      setBatchSubmitting(false);
+    }
+  }
+
   return (
-    <ul className="mt-3 flex flex-col gap-2 border-t border-black/5 dark:border-white/10 pt-3">
-      {details.map((d) => (
-        <DetailRowItem key={d.id} detail={d} decks={decks} onDrawn={onDrawn} />
-      ))}
-    </ul>
+    <div className="mt-3 border-t border-black/5 dark:border-white/10 pt-3">
+      <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-500 mb-2">
+        <span>明細狀態匯總:</span>
+        {DETAIL_STATUSES.map((s) => (
+          <span key={s}>
+            {s} {summary[s]}/{details.length}
+          </span>
+        ))}
+      </div>
+
+      {selected.size > 0 && (
+        <div className="flex items-center gap-2 text-xs mb-2">
+          <span>已選 {selected.size} 筆</span>
+          {uniformCurrent && nextForUniform ? (
+            <>
+              <button
+                disabled={batchSubmitting}
+                onClick={() => setBatchTarget(nextForUniform)}
+                className={`px-2 py-1 rounded border ${batchTarget === nextForUniform ? "bg-foreground text-background" : "border-black/15 dark:border-white/20"}`}
+              >
+                推進為「{nextForUniform}」
+              </button>
+              {batchTarget === nextForUniform && (
+                <button
+                  disabled={batchSubmitting}
+                  onClick={applyBatch}
+                  className="px-2 py-1 rounded bg-foreground text-background disabled:opacity-50"
+                >
+                  {batchSubmitting ? "送出中…" : "確認套用"}
+                </button>
+              )}
+            </>
+          ) : (
+            <span className="text-orange-600 dark:text-orange-400">
+              所選明細目前狀態不一致,請個別操作或篩選同狀態再批次推進
+            </span>
+          )}
+        </div>
+      )}
+      {batchMsg && <p className="text-xs text-blue-700 dark:text-blue-400 mb-2">{batchMsg}</p>}
+
+      <ul className="flex flex-col gap-2">
+        {details.map((d) => (
+          <DetailRowItem
+            key={d.id}
+            detail={d}
+            decks={decks}
+            onDrawn={onDrawn}
+            onStatusChanged={onStatusChanged}
+            selected={selected.has(d.id)}
+            onToggleSelect={() => toggle(d.id)}
+          />
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -297,15 +431,22 @@ function DetailRowItem({
   detail,
   decks,
   onDrawn,
+  onStatusChanged,
+  selected,
+  onToggleSelect,
 }: {
   detail: DetailRow;
   decks: Deck[];
   onDrawn: () => void;
+  onStatusChanged: () => void;
+  selected: boolean;
+  onToggleSelect: () => void;
 }) {
   const [deckCode, setDeckCode] = useState(decks[0]?.牌組代碼 ?? "");
   const [numbers, setNumbers] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [statusMsg, setStatusMsg] = useState<string | null>(null);
 
   async function submit() {
     setSubmitting(true);
@@ -331,10 +472,47 @@ function DetailRowItem({
     }
   }
 
+  async function advanceDetailStatus(newStatus: string) {
+    setStatusMsg(null);
+    const res = await fetch(`/api/details/${detail.id}/status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ newStatus }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setStatusMsg(`失敗:${data.error}`);
+      return;
+    }
+    onStatusChanged();
+  }
+
   return (
     <li className="text-sm flex flex-wrap items-center gap-2">
+      <input type="checkbox" checked={selected} onChange={onToggleSelect} />
       <span className="font-mono text-xs">{detail.明細編號}</span>
       <span className="text-xs text-zinc-500">{detail.對應日期}</span>
+      <span className="text-xs px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800">
+        {normalizeDetailStatus(detail.明細狀態)}
+      </span>
+      <select
+        className="text-xs border rounded px-1 py-0.5 bg-transparent"
+        value=""
+        onChange={(e) => {
+          if (e.target.value) advanceDetailStatus(e.target.value);
+          e.target.value = "";
+        }}
+      >
+        <option value="">推進明細狀態…</option>
+        {DETAIL_STATUSES.filter(
+          (st) => DETAIL_STATUSES.indexOf(st) > DETAIL_STATUSES.indexOf(normalizeDetailStatus(detail.明細狀態))
+        ).map((st) => (
+          <option key={st} value={st}>
+            {st}
+          </option>
+        ))}
+      </select>
+      {statusMsg && <span className="text-xs text-red-600">{statusMsg}</span>}
       {detail.抽出順序 ? (
         <span className="text-xs">{detail.抽出順序}</span>
       ) : (

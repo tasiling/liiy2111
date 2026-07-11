@@ -30,6 +30,16 @@ export const SESSION_STATUS_ORDER = [
   "已交付",
 ] as const;
 export type SessionStatus = (typeof SESSION_STATUS_ORDER)[number];
+export const SESSION_STATUS_DEFAULT: SessionStatus = "已抽牌";
+
+// 防禦性 fallback(與 normalizeDetailStatus 對稱):讀到空值或非法值一律視同「已抽牌」
+// (狀態機起點),不讓判斷/顯示卡在「未知狀態」。建立 Session 時本就強制寫入狀態
+// (見 mutations.ts createSession),此 fallback 是額外一層防線,不是取代寫入時的預設值。
+export function normalizeSessionStatus(status: string | null | undefined): SessionStatus {
+  return status && (SESSION_STATUS_ORDER as readonly string[]).includes(status)
+    ? (status as SessionStatus)
+    : SESSION_STATUS_DEFAULT;
+}
 
 // v1.3(產線 A 委派書):擁有者已在 Notion 手動新增後 4 個選項,解決序列展開任務無處分類的落差。
 export const SESSION_項目用途 = [
@@ -63,6 +73,20 @@ export const EVENT_STATUS = ["啟用", "停用"] as const;
 // DB-15 場次表狀態
 export const SESSION_SLOT_STATUS = ["預定", "已完成"] as const;
 
+// DB-04 抽牌明細「明細狀態」(委派書 v1.6 新增):單筆明細的生產進度,順序固定,終點=已交付。
+// 表頭 DB-03「狀態」不受影響——批次 Session 的實際進度改由此欄匯總顯示,表頭仍是 Session 整體生命週期。
+export const DETAIL_STATUS_ORDER = ["待產出", "已產出", "已交付"] as const;
+export type DetailStatus = (typeof DETAIL_STATUS_ORDER)[number];
+export const DETAIL_STATUS_DEFAULT: DetailStatus = "待產出";
+
+// 防禦性 fallback:讀到空值(舊資料、任何管道漏寫)一律視同「待產出」,不讓儀表出現黑數。
+// 推進動作照常寫入真值,下次讀取自然是真的值——不需要額外一次性回填腳本。
+export function normalizeDetailStatus(status: string | null | undefined): DetailStatus {
+  return status && (DETAIL_STATUS_ORDER as readonly string[]).includes(status)
+    ? (status as DetailStatus)
+    : DETAIL_STATUS_DEFAULT;
+}
+
 // DB-05 解讀規則庫「適用項目」(v2.5:六項擴為七項,新增服務導流占卜)
 export const RULE_適用項目 = [
   "能量流",
@@ -74,6 +98,28 @@ export const RULE_適用項目 = [
   "服務導流占卜",
 ] as const;
 export const RULE_STATUS = ["現行", "舊版", "待審"] as const;
+
+// 七維度・七方法(總綱 v2.4 凍結封閉清單,供 R-服務導流占卜與 R-心理測驗共用)。
+// P8-0 維度/方法選擇僅用「方法」清單提供可換選項;維度/方法配對本身屬擁有者職權,
+// App 不得實作自動配對(委派書禁區)。
+export const SEVEN_DIMENSIONS = [
+  "身體/能量",
+  "情緒",
+  "信念",
+  "行動/意志",
+  "自我認同",
+  "關係",
+  "願景/價值",
+] as const;
+export const SEVEN_METHODS = [
+  "程度量表法",
+  "隱喻聯想法",
+  "投射書寫法",
+  "角色代入法",
+  "配對圖卡法",
+  "情境選擇法",
+  "排序偏好法",
+] as const;
 
 // DB-09 回饋紀錄:四維評分欄位與範圍(Notion 端無法強制,App 端必須驗證 1–5)
 export const FEEDBACK_SCORE_FIELDS = ["準確度", "語感", "轉換效果", "可複用性"] as const;
