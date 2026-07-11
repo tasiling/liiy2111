@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDetail } from "@/lib/notion/queries";
 import { canAdvanceDetailStatus, updateDetailStatus } from "@/lib/notion/mutations";
-import { DETAIL_STATUS_ORDER, type DetailStatus } from "@/lib/notion/schema";
+import { DETAIL_STATUS_ORDER, normalizeDetailStatus, type DetailStatus } from "@/lib/notion/schema";
 
 // P5 明細狀態單筆推進(委派書 v1.6):只允許順序推進,待產出→已產出→已交付。
+// 讀到空值一律視同「待產出」(防禦性 fallback),推進時照常寫入真值,自然修復舊資料。
 export async function PATCH(req: NextRequest, ctx: RouteContext<"/api/details/[id]/status">) {
   const { id } = await ctx.params;
   const body = await req.json();
@@ -14,15 +15,13 @@ export async function PATCH(req: NextRequest, ctx: RouteContext<"/api/details/[i
   }
 
   const detail = await getDetail(id);
-  if (!detail.明細狀態) {
-    return NextResponse.json({ error: "找不到現有明細狀態" }, { status: 404 });
-  }
+  const current = normalizeDetailStatus(detail.明細狀態);
 
-  const check = canAdvanceDetailStatus(detail.明細狀態 as DetailStatus, newStatus);
+  const check = canAdvanceDetailStatus(current, newStatus);
   if (!check.ok) {
     return NextResponse.json({ error: check.reason }, { status: 409 });
   }
 
   await updateDetailStatus(id, newStatus);
-  return NextResponse.json({ ok: true, from: detail.明細狀態, to: newStatus });
+  return NextResponse.json({ ok: true, from: current, to: newStatus });
 }

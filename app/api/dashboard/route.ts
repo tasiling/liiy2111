@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { listDetailsInRange, listSlotsInRange, getSession } from "@/lib/notion/queries";
-import { SESSION_STATUS_ORDER, DETAIL_STATUS_ORDER } from "@/lib/notion/schema";
+import { SESSION_STATUS_ORDER, DETAIL_STATUS_ORDER, normalizeDetailStatus } from "@/lib/notion/schema";
 
 function monthRange(yearMonth: string): { start: string; end: string } {
   const [y, m] = yearMonth.split("-").map(Number);
@@ -72,7 +72,8 @@ export async function GET(req: NextRequest) {
     if (!session) continue;
     if (session.模式 === "批次") {
       batchTotal++;
-      if (d.明細狀態 && d.明細狀態 in batchDetailStatus) batchDetailStatus[d.明細狀態]++;
+      // 空值一律視同「待產出」(防禦性 fallback),不讓儀表出現黑數;寫入端的推進動作會補上真值。
+      batchDetailStatus[normalizeDetailStatus(d.明細狀態)]++;
     } else if (session.模式 === "單筆" && !countedSingleSessionIds.has(session.id)) {
       countedSingleSessionIds.add(session.id);
       singleTotal++;

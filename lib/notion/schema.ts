@@ -69,6 +69,14 @@ export const DETAIL_STATUS_ORDER = ["待產出", "已產出", "已交付"] as co
 export type DetailStatus = (typeof DETAIL_STATUS_ORDER)[number];
 export const DETAIL_STATUS_DEFAULT: DetailStatus = "待產出";
 
+// 防禦性 fallback:讀到空值(舊資料、任何管道漏寫)一律視同「待產出」,不讓儀表出現黑數。
+// 推進動作照常寫入真值,下次讀取自然是真的值——不需要額外一次性回填腳本。
+export function normalizeDetailStatus(status: string | null | undefined): DetailStatus {
+  return status && (DETAIL_STATUS_ORDER as readonly string[]).includes(status)
+    ? (status as DetailStatus)
+    : DETAIL_STATUS_DEFAULT;
+}
+
 // DB-05 解讀規則庫「適用項目」(v2.5:六項擴為七項,新增服務導流占卜)
 export const RULE_適用項目 = [
   "能量流",

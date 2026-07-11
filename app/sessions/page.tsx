@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { SESSION_STATUS_ORDER, SESSION_項目用途, DETAIL_STATUS_ORDER } from "@/lib/notion/schema";
+import {
+  SESSION_STATUS_ORDER,
+  SESSION_項目用途,
+  DETAIL_STATUS_ORDER,
+  normalizeDetailStatus,
+} from "@/lib/notion/schema";
 
 const STATUS_ORDER: readonly string[] = SESSION_STATUS_ORDER;
 const 項目用途_OPTIONS: readonly string[] = SESSION_項目用途;
@@ -315,15 +320,17 @@ function DetailList({
   const [batchMsg, setBatchMsg] = useState<string | null>(null);
   const [batchSubmitting, setBatchSubmitting] = useState(false);
 
+  // 空值一律視同「待產出」(防禦性 fallback),不讓儀表/清單出現黑數;
+  // 推進動作照常寫入真值,舊資料重新整理後就會顯示真的狀態。
   const summary: Record<string, number> = Object.fromEntries(DETAIL_STATUSES.map((s) => [s, 0]));
   for (const d of details) {
-    if (d.明細狀態 && d.明細狀態 in summary) summary[d.明細狀態]++;
+    summary[normalizeDetailStatus(d.明細狀態)]++;
   }
 
   // 多選批次推進:所選明細目前狀態須一致,才能明確知道「推進到下一步」是哪一步,
   // 避免混合狀態時的跳步語意不清。
   const selectedDetails = details.filter((d) => selected.has(d.id));
-  const selectedCurrentStatuses = new Set(selectedDetails.map((d) => d.明細狀態));
+  const selectedCurrentStatuses = new Set(selectedDetails.map((d) => normalizeDetailStatus(d.明細狀態)));
   const uniformCurrent = selectedCurrentStatuses.size === 1 ? [...selectedCurrentStatuses][0] : null;
   const nextForUniform =
     uniformCurrent && DETAIL_STATUSES.includes(uniformCurrent)
@@ -485,7 +492,7 @@ function DetailRowItem({
       <span className="font-mono text-xs">{detail.明細編號}</span>
       <span className="text-xs text-zinc-500">{detail.對應日期}</span>
       <span className="text-xs px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800">
-        {detail.明細狀態}
+        {normalizeDetailStatus(detail.明細狀態)}
       </span>
       <select
         className="text-xs border rounded px-1 py-0.5 bg-transparent"
@@ -496,13 +503,13 @@ function DetailRowItem({
         }}
       >
         <option value="">推進明細狀態…</option>
-        {DETAIL_STATUSES.filter((st) => DETAIL_STATUSES.indexOf(st) > DETAIL_STATUSES.indexOf(detail.明細狀態 ?? "")).map(
-          (st) => (
-            <option key={st} value={st}>
-              {st}
-            </option>
-          )
-        )}
+        {DETAIL_STATUSES.filter(
+          (st) => DETAIL_STATUSES.indexOf(st) > DETAIL_STATUSES.indexOf(normalizeDetailStatus(detail.明細狀態))
+        ).map((st) => (
+          <option key={st} value={st}>
+            {st}
+          </option>
+        ))}
       </select>
       {statusMsg && <span className="text-xs text-red-600">{statusMsg}</span>}
       {detail.抽出順序 ? (
