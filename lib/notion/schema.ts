@@ -30,6 +30,16 @@ export const SESSION_STATUS_ORDER = [
   "已交付",
 ] as const;
 export type SessionStatus = (typeof SESSION_STATUS_ORDER)[number];
+export const SESSION_STATUS_DEFAULT: SessionStatus = "已抽牌";
+
+// 防禦性 fallback(與 normalizeDetailStatus 對稱):讀到空值或非法值一律視同「已抽牌」
+// (狀態機起點),不讓判斷/顯示卡在「未知狀態」。建立 Session 時本就強制寫入狀態
+// (見 mutations.ts createSession),此 fallback 是額外一層防線,不是取代寫入時的預設值。
+export function normalizeSessionStatus(status: string | null | undefined): SessionStatus {
+  return status && (SESSION_STATUS_ORDER as readonly string[]).includes(status)
+    ? (status as SessionStatus)
+    : SESSION_STATUS_DEFAULT;
+}
 
 // v1.3(產線 A 委派書):擁有者已在 Notion 手動新增後 4 個選項,解決序列展開任務無處分類的落差。
 export const SESSION_項目用途 = [

@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { listDetailsInRange, listSlotsInRange, getSession } from "@/lib/notion/queries";
-import { SESSION_STATUS_ORDER, DETAIL_STATUS_ORDER, normalizeDetailStatus } from "@/lib/notion/schema";
+import {
+  SESSION_STATUS_ORDER,
+  DETAIL_STATUS_ORDER,
+  normalizeDetailStatus,
+  normalizeSessionStatus,
+} from "@/lib/notion/schema";
 
 function monthRange(yearMonth: string): { start: string; end: string } {
   const [y, m] = yearMonth.split("-").map(Number);
@@ -77,7 +82,7 @@ export async function GET(req: NextRequest) {
     } else if (session.模式 === "單筆" && !countedSingleSessionIds.has(session.id)) {
       countedSingleSessionIds.add(session.id);
       singleTotal++;
-      if (session.狀態 && session.狀態 in singleSessionStatus) singleSessionStatus[session.狀態]++;
+      singleSessionStatus[normalizeSessionStatus(session.狀態)]++;
     }
   }
   const total = singleTotal + batchTotal;

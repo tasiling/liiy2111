@@ -6,6 +6,7 @@ import {
   SESSION_項目用途,
   DETAIL_STATUS_ORDER,
   normalizeDetailStatus,
+  normalizeSessionStatus,
 } from "@/lib/notion/schema";
 
 const STATUS_ORDER: readonly string[] = SESSION_STATUS_ORDER;
@@ -66,7 +67,7 @@ export default function SessionsPage() {
   }
 
   async function advanceStatus(session: SessionRow, newStatus: string) {
-    const curIdx = STATUS_ORDER.indexOf(session.狀態 ?? "");
+    const curIdx = STATUS_ORDER.indexOf(normalizeSessionStatus(session.狀態));
     const nextIdx = STATUS_ORDER.indexOf(newStatus);
     const isSkip = nextIdx > curIdx + 1;
     if (isSkip && !confirm(`「${newStatus}」跳過了中間步驟,確定要跳步嗎?`)) return;
@@ -103,7 +104,7 @@ export default function SessionsPage() {
                 <span className="text-xs text-zinc-500">{s.項目用途}</span>
                 <span className="text-xs text-zinc-500">{s.模式}</span>
                 <span className="text-xs px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800">
-                  {s.狀態}
+                  {normalizeSessionStatus(s.狀態)}
                 </span>
                 <select
                   className="ml-auto text-xs border rounded px-1 py-0.5 bg-transparent"
@@ -114,7 +115,7 @@ export default function SessionsPage() {
                   }}
                 >
                   <option value="">推進狀態…</option>
-                  {STATUS_ORDER.filter((st) => st !== s.狀態).map((st) => (
+                  {STATUS_ORDER.filter((st) => st !== normalizeSessionStatus(s.狀態)).map((st) => (
                     <option key={st} value={st}>
                       {st}
                     </option>
