@@ -1,0 +1,10 @@
+{
+  "speaker_names": {
+    "SPEAKER_00": "9U",
+    "SPEAKER_01": "我"
+  },
+  "merge": {
+    "max_gap_seconds": 1.0,
+    "max_segment_seconds": 30.0
+  }
+}

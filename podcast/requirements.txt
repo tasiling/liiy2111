@@ -1,0 +1,7 @@
+faster-whisper
+pyannote.audio>=3.1
+pydub
+ffmpeg-python
+silero-vad
+python-dotenv
+huggingface_hub

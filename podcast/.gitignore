@@ -1,0 +1,27 @@
+# 音檔（原始與處理後皆不進版控）
+*.wav
+*.mp3
+*.m4a
+*.flac
+*.aac
+*.ogg
+*.aiff
+
+# 模型快取
+.cache/
+models/
+*.pt
+*.bin
+*.onnx
+~/.cache/
+
+# Hugging Face token 等秘密
+.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# 中間產物太大時可視情況排除，預設 JSON/txt 逐字稿保留進版控
