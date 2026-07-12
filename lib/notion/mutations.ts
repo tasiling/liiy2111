@@ -4,10 +4,23 @@ import {
   SESSION_STATUS_ORDER,
   DETAIL_STATUS_ORDER,
   DETAIL_STATUS_DEFAULT,
+  FEEDBACK_SCORE_FIELDS,
+  FEEDBACK_SCORE_MIN,
+  FEEDBACK_SCORE_MAX,
   type SessionStatus,
   type DetailStatus,
+  type Feedback對象類型,
 } from "./schema";
-import { titleProp, richTextProp, selectProp, dateProp, relationProp, urlProp } from "./properties";
+import {
+  titleProp,
+  richTextProp,
+  selectProp,
+  multiSelectProp,
+  numberProp,
+  dateProp,
+  relationProp,
+  urlProp,
+} from "./properties";
 import { queryAll } from "./queries";
 import { readTitle } from "./properties";
 
@@ -171,4 +184,64 @@ export async function findSessionCodeById(sessionId: string): Promise<string> {
   const page = await withNotionRateLimit(() => notion().pages.retrieve({ page_id: sessionId }));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return readTitle(page as any, "Session 編號");
+}
+
+// --- DB-09 回饋紀錄:P6 回饋快填 ---
+
+// 回饋編號格式比照 Session 編號慣例:FB-YYYYMMDD-流水號。
+export async function nextFeedbackCode(dateISO: string): Promise<string> {
+  const ymd = dateISO.replace(/-/g, "");
+  const existing = await queryAll(DATA_SOURCES.DB09_回饋紀錄, {
+    property: "回饋編號",
+    title: { starts_with: `FB-${ymd}-` },
+  });
+  const serial = existing.length + 1;
+  return `FB-${ymd}-${String(serial).padStart(3, "0")}`;
+}
+
+// 寫入驗證(委派書五之 1):四維評分限 1–5,App 端強制檢查(Notion number 欄位無法內建範圍限制)。
+export function validateFeedbackScore(value: number): { ok: boolean; reason?: string } {
+  if (!Number.isFinite(value) || value < FEEDBACK_SCORE_MIN || value > FEEDBACK_SCORE_MAX) {
+    return { ok: false, reason: `評分須介於 ${FEEDBACK_SCORE_MIN}–${FEEDBACK_SCORE_MAX}` };
+  }
+  return { ok: true };
+}
+
+export async function createFeedback(params: {
+  dateISO: string;
+  對象類型: Feedback對象類型;
+  targetId: string; // 對象類型=規則 時填 DB-05 頁面 id,=Session 時填 DB-03 頁面 id
+  準確度: number;
+  語感: number;
+  轉換效果: number;
+  可複用性: number;
+  問題類型標籤: string[];
+  短評?: string;
+}) {
+  for (const field of FEEDBACK_SCORE_FIELDS) {
+    const check = validateFeedbackScore(params[field]);
+    if (!check.ok) throw new Error(`${field}:${check.reason}`);
+  }
+  const code = await nextFeedbackCode(params.dateISO);
+  const targetProp = params.對象類型 === "規則" ? "對象-規則" : "對象-Session";
+  const page = await withNotionRateLimit(() =>
+    notion().pages.create({
+      parent: { type: "data_source_id", data_source_id: DATA_SOURCES.DB09_回饋紀錄 },
+      properties: {
+        回饋編號: titleProp(code),
+        對象類型: selectProp(params.對象類型),
+        [targetProp]: relationProp([params.targetId]),
+        // P6 為擁有者手動快填的當下評分,對應「個人評價時填」的四維評分欄位。
+        來源: selectProp("個人評價"),
+        日期: dateProp(params.dateISO),
+        準確度: numberProp(params.準確度),
+        語感: numberProp(params.語感),
+        轉換效果: numberProp(params.轉換效果),
+        可複用性: numberProp(params.可複用性),
+        ...(params.問題類型標籤.length ? { 問題類型標籤: multiSelectProp(params.問題類型標籤) } : {}),
+        ...(params.短評 ? { 短評: richTextProp(params.短評) } : {}),
+      },
+    })
+  );
+  return { id: page.id, code };
 }

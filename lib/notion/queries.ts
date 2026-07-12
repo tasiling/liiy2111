@@ -241,6 +241,47 @@ export async function listCurrentRulesFor適用項目(適用項目: string) {
   return pages.map(mapRule);
 }
 
+// P6 回饋快填用:對象=規則時,選單列出全部現行版規則(不分適用項目)。
+export async function listCurrentRules() {
+  const pages = await queryAll(DATA_SOURCES.DB05_解讀規則庫, {
+    property: "狀態",
+    select: { equals: "現行" },
+  });
+  return pages.map(mapRule);
+}
+
+// --- DB-09 回饋紀錄 ---
+export function mapFeedback(p: NotionPage) {
+  return {
+    id: p.id,
+    回饋編號: readTitle(p, "回饋編號"),
+    對象類型: readSelect(p, "對象類型"),
+    對象Session: readRelationIds(p, "對象-Session"),
+    對象規則: readRelationIds(p, "對象-規則"),
+    來源: readSelect(p, "來源"),
+    準確度: readNumber(p, "準確度"),
+    語感: readNumber(p, "語感"),
+    轉換效果: readNumber(p, "轉換效果"),
+    可複用性: readNumber(p, "可複用性"),
+    問題類型標籤: readMultiSelect(p, "問題類型標籤"),
+    短評: readRichText(p, "短評"),
+    日期: readDateStart(p, "日期"),
+  };
+}
+
+// 問題類型標籤累積次數統計(P6「達三次原則」提示用)——全量掃描 DB-09,
+// 資料量小(手動快填累積),不特別分頁優化。
+export async function countFeedbackTags(): Promise<Record<string, number>> {
+  const pages = await queryAll(DATA_SOURCES.DB09_回饋紀錄);
+  const counts: Record<string, number> = {};
+  for (const p of pages) {
+    for (const tag of readMultiSelect(p, "問題類型標籤")) {
+      counts[tag] = (counts[tag] ?? 0) + 1;
+    }
+  }
+  return counts;
+}
+
 // --- DB-08 月主題包:P8 組稿用 ---
 export function mapMonthlyTheme(p: NotionPage) {
   return {
