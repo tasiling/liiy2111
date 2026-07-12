@@ -33,6 +33,9 @@ export default function RootLayout({
           <Link href="/" className="font-medium hover:underline">
             主控台
           </Link>
+          <Link href="/production-day" className="font-medium hover:underline">
+            生產日工作台
+          </Link>
           <Link href="/sessions" className="font-medium hover:underline">
             Session 工作站
           </Link>

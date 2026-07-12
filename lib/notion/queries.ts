@@ -306,6 +306,7 @@ export function mapMonthlyTheme(p: NotionPage) {
     深度討論題目: readRichText(p, "深度討論題目"),
     每日互動方向: readRichText(p, "每日互動方向"),
     當月三款主題服務: readRichText(p, "當月三款主題服務"),
+    能量關鍵字: readRelationIds(p, "能量關鍵字"),
   };
 }
 
@@ -332,6 +333,8 @@ export function mapKnowledge(p: NotionPage) {
     來源: readSelect(p, "來源"),
     核可狀態: readSelect(p, "核可狀態"),
     連結: readUrl(p, "連結"),
+    主題標籤: readRelationIds(p, "主題標籤"),
+    狀態: readSelect(p, "狀態"), // 存貨/已排入/已發布(P3 知識庫比對用,勿與「核可狀態」混淆)
   };
 }
 
@@ -352,6 +355,47 @@ export async function listApprovedKnowledgeEntries() {
     select: { equals: "已核可" },
   });
   return pages.map(mapKnowledge);
+}
+
+// P3 生產日工作台第 3 步「知識庫比對」用:不篩核可狀態,依主題標籤交集比對
+// (見 lib/match.ts),只列清單供參考,擁有者自行判斷排入。
+export async function listAllKnowledgeEntries() {
+  const pages = await queryAll(DATA_SOURCES.DB14_知識庫);
+  return pages.map(mapKnowledge);
+}
+
+// --- DB-11 服務原子庫:P3 第 2 步「服務組合」支援,依月主題包能量關鍵字比對 ---
+export function mapAtom(p: NotionPage) {
+  return {
+    id: p.id,
+    原子項名稱: readTitle(p, "原子項名稱"),
+    狀態: readSelect(p, "狀態"),
+    能量屬性標籤: readRelationIds(p, "能量屬性標籤"),
+    可組合性: readRichText(p, "可組合性"),
+    價格: readNumber(p, "價格"),
+  };
+}
+
+export async function listActiveServiceAtoms() {
+  const pages = await queryAll(DATA_SOURCES.DB11_服務原子庫, {
+    property: "狀態",
+    select: { equals: "啟用" },
+  });
+  return pages.map(mapAtom);
+}
+
+// --- DB-16 標籤詞庫:P3 比對結果顯示「命中標籤」名稱用 ---
+export function mapTag(p: NotionPage) {
+  return {
+    id: p.id,
+    標籤名: readTitle(p, "標籤名"),
+    狀態: readSelect(p, "狀態"),
+  };
+}
+
+export async function listAllTags() {
+  const pages = await queryAll(DATA_SOURCES.DB16_標籤詞庫);
+  return pages.map(mapTag);
 }
 
 // --- 讀取一般 Notion 頁面內容為純文字(用於語氣指引「連結」指向另一頁全文的情況) ---
