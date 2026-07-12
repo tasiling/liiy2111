@@ -85,6 +85,7 @@ export function mapSession(p: NotionPage) {
     建立日期: readDateStart(p, "建立日期"),
     抽牌明細: readRelationIds(p, "抽牌明細"),
     產出連結: readUrl(p, "產出連結"),
+    使用規則: readRelationIds(p, "使用規則"),
   };
 }
 
@@ -248,6 +249,20 @@ export async function listCurrentRules() {
     select: { equals: "現行" },
   });
   return pages.map(mapRule);
+}
+
+// P6 規則選單兩段式(擁有者裁決):最近 N 天內有 Session 使用過的規則置頂,其餘收進
+// 「更多」。純前端分組用的輔助清單,不改變 listCurrentRules() 回傳的資料本身。
+// 依 DB-03「使用規則」關聯,取最近 N 天建立的 Session 用過的規則 id 聯集。
+export async function listRecentlyUsedRuleIds(days: number): Promise<string[]> {
+  const end = new Date().toISOString().slice(0, 10);
+  const start = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const sessions = await listSessionsCreatedBetween(start, end);
+  const ids = new Set<string>();
+  for (const s of sessions) {
+    for (const ruleId of s.使用規則) ids.add(ruleId);
+  }
+  return [...ids];
 }
 
 // --- DB-09 回饋紀錄 ---

@@ -20,6 +20,8 @@ export default function FeedbackPage() {
   const [對象類型, set對象類型] = useState<string>(對象類型_OPTIONS[1]); // 預設 Session,較常用
   const [targetId, setTargetId] = useState("");
   const [rules, setRules] = useState<Rule[]>([]);
+  const [recentRuleIds, setRecentRuleIds] = useState<Set<string>>(new Set());
+  const [showMoreRules, setShowMoreRules] = useState(false);
   const [sessions, setSessions] = useState<SessionOption[]>([]);
   const [scores, setScores] = useState<Record<string, number | null>>({
     準確度: null,
@@ -37,7 +39,10 @@ export default function FeedbackPage() {
   useEffect(() => {
     fetch("/api/rules")
       .then((r) => r.json())
-      .then((d) => setRules(d.rules ?? []));
+      .then((d) => {
+        setRules(d.rules ?? []);
+        setRecentRuleIds(new Set<string>(d.recentlyUsedIds ?? []));
+      });
     fetch("/api/sessions")
       .then((r) => r.json())
       .then((d) => setSessions(d.sessions ?? []));
@@ -125,18 +130,14 @@ export default function FeedbackPage() {
           ))}
         </div>
         {對象類型 === "規則" ? (
-          <select
-            className="border rounded px-2 py-2 bg-transparent text-sm"
-            value={targetId}
-            onChange={(e) => setTargetId(e.target.value)}
-          >
-            <option value="">選擇規則…</option>
-            {rules.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.規則代碼} {r.規則名稱}
-              </option>
-            ))}
-          </select>
+          <RulePicker
+            rules={rules}
+            recentIds={recentRuleIds}
+            targetId={targetId}
+            onSelect={setTargetId}
+            showMore={showMoreRules}
+            onToggleShowMore={() => setShowMoreRules((v) => !v)}
+          />
         ) : (
           <select
             className="border rounded px-2 py-2 bg-transparent text-sm"
@@ -217,5 +218,75 @@ export default function FeedbackPage() {
         {submitting ? "送出中…" : "送出"}
       </button>
     </div>
+  );
+}
+
+// 規則選單兩段式(擁有者裁決):最近 14 天內有 Session 使用過的現行規則置頂,
+// 其餘收進「更多」展開——純前端分組顯示順序,不改變 API 回傳的規則清單本身。
+function RulePicker({
+  rules,
+  recentIds,
+  targetId,
+  onSelect,
+  showMore,
+  onToggleShowMore,
+}: {
+  rules: Rule[];
+  recentIds: Set<string>;
+  targetId: string;
+  onSelect: (id: string) => void;
+  showMore: boolean;
+  onToggleShowMore: () => void;
+}) {
+  const pinned = rules.filter((r) => recentIds.has(r.id));
+  const rest = rules.filter((r) => !recentIds.has(r.id));
+  const hasPinned = pinned.length > 0;
+
+  return (
+    <div className="flex flex-col gap-1">
+      {!hasPinned && rules.length > 0 && (
+        <p className="text-xs text-zinc-500">最近 14 天沒有 Session 用過現行規則,以下為全部規則。</p>
+      )}
+      <div className="flex flex-col gap-1">
+        {(hasPinned ? pinned : rules).map((r) => (
+          <RuleOption key={r.id} rule={r} active={targetId === r.id} onSelect={onSelect} />
+        ))}
+      </div>
+      {hasPinned && rest.length > 0 && (
+        <>
+          <button className="text-xs underline text-left w-fit" onClick={onToggleShowMore}>
+            {showMore ? "收合" : `更多規則(${rest.length})`}
+          </button>
+          {showMore && (
+            <div className="flex flex-col gap-1">
+              {rest.map((r) => (
+                <RuleOption key={r.id} rule={r} active={targetId === r.id} onSelect={onSelect} />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function RuleOption({
+  rule,
+  active,
+  onSelect,
+}: {
+  rule: Rule;
+  active: boolean;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <button
+      onClick={() => onSelect(rule.id)}
+      className={`text-left px-2 py-2 rounded border text-sm ${
+        active ? "bg-foreground text-background border-foreground" : "border-black/15 dark:border-white/20"
+      }`}
+    >
+      {rule.規則代碼} {rule.規則名稱}
+    </button>
   );
 }
