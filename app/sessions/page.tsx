@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   SESSION_STATUS_ORDER,
   SESSION_項目用途,
@@ -19,6 +20,7 @@ type SessionRow = {
   狀態: string | null;
   模式: string | null;
   項目用途: string | null;
+  產出連結?: string | null;
 };
 
 type Deck = { id: string; 牌組代碼: string; 牌組名稱: string };
@@ -32,23 +34,64 @@ type DetailRow = {
 };
 
 export default function SessionsPage() {
+  return (
+    <Suspense fallback={<p className="text-sm text-zinc-500">載入中…</p>}>
+      <SessionsPageInner />
+    </Suspense>
+  );
+}
+
+function SessionsPageInner() {
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [decks, setDecks] = useState<Deck[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [details, setDetails] = useState<DetailRow[]>([]);
   const [msg, setMsg] = useState<string | null>(null);
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const rowRefs = useRef<Map<string, HTMLLIElement>>(new Map());
 
   function refreshSessions() {
-    fetch("/api/sessions")
+    return fetch("/api/sessions")
       .then((r) => r.json())
-      .then((d) => setSessions(d.sessions ?? []));
+      .then((d) => {
+        setSessions(d.sessions ?? []);
+        return d.sessions ?? [];
+      });
   }
 
   useEffect(() => {
-    refreshSessions();
     fetch("/api/decks")
       .then((r) => r.json())
       .then((d) => setDecks(d.decks ?? []));
+
+    // 從行事曆任務點擊跳轉過來時(?sessionId=xxx),自動展開該 Session 明細並捲動定位。
+    // 若目標不在近期清單(建立日期超過 60 天)內,直接補查該筆表頭,插入清單最前面顯示。
+    const targetId = searchParams.get("sessionId");
+    refreshSessions().then(async (loaded: SessionRow[]) => {
+      if (!targetId) return;
+      let target = loaded.find((s) => s.id === targetId);
+      if (!target) {
+        try {
+          const r = await fetch(`/api/sessions/${targetId}`);
+          if (r.ok) {
+            const data = await r.json();
+            target = data.session;
+            if (target) setSessions((prev) => [target as SessionRow, ...prev]);
+          }
+        } catch {
+          // 查無此筆(如 ID 錯誤或已刪除),不阻斷頁面,底下 highlightId 找不到對應列即安靜略過。
+        }
+      }
+      if (target) {
+        setHighlightId(target.id);
+        await openDetails(target.id);
+        rowRefs.current.get(target.id)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      } else {
+        setMsg(`找不到指定的 Session(${targetId}),可能已刪除或 ID 有誤。`);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function refreshDetails(sessionId: string) {
@@ -98,7 +141,18 @@ export default function SessionsPage() {
         <h2 className="font-medium mb-3">近期 Session</h2>
         <ul className="flex flex-col gap-2">
           {sessions.map((s) => (
-            <li key={s.id} className="border border-black/5 dark:border-white/10 rounded p-3">
+            <li
+              key={s.id}
+              ref={(el) => {
+                if (el) rowRefs.current.set(s.id, el);
+                else rowRefs.current.delete(s.id);
+              }}
+              className={`border rounded p-3 ${
+                highlightId === s.id
+                  ? "border-blue-500 ring-2 ring-blue-500"
+                  : "border-black/5 dark:border-white/10"
+              }`}
+            >
               <div className="flex items-center gap-2 text-sm flex-wrap">
                 <span className="font-mono">{s.Session編號}</span>
                 <span className="text-xs text-zinc-500">{s.項目用途}</span>
@@ -128,6 +182,12 @@ export default function SessionsPage() {
                   {expandedId === s.id ? "收合明細" : "查看明細"}
                 </button>
               </div>
+              <OutputLinkEditor
+                session={s}
+                onSaved={(url) =>
+                  setSessions((prev) => prev.map((row) => (row.id === s.id ? { ...row, 產出連結: url } : row)))
+                }
+              />
               {expandedId === s.id && (
                 <>
                   <DetailList
@@ -545,5 +605,92 @@ function DetailRowItem({
       )}
       {msg && <span className="text-xs text-blue-700 dark:text-blue-400">{msg}</span>}
     </li>
+  );
+}
+
+// 「產出連結」檢視與編輯(擁有者追加指示):支援內容完成後手動補登記連結,純欄位覆寫,
+// 不牽動狀態機。留空儲存代表清空(撤銷誤填的連結)。
+function OutputLinkEditor({
+  session,
+  onSaved,
+}: {
+  session: SessionRow;
+  onSaved: (url: string | null) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(session.產出連結 ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save() {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/sessions/${session.id}/output-link`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: value.trim() }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "儲存失敗");
+      onSaved(value.trim() || null);
+      setEditing(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!editing) {
+    return (
+      <div className="flex items-center gap-2 text-xs mt-1">
+        <span className="text-zinc-500">產出連結:</span>
+        {session.產出連結 ? (
+          <a
+            href={session.產出連結}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline text-blue-700 dark:text-blue-400 truncate max-w-xs"
+          >
+            {session.產出連結}
+          </a>
+        ) : (
+          <span className="text-zinc-400">未登記</span>
+        )}
+        <button className="underline" onClick={() => setEditing(true)}>
+          編輯
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2 text-xs mt-1">
+      <span className="text-zinc-500">產出連結:</span>
+      <input
+        className="border rounded px-1 py-0.5 bg-transparent flex-1 min-w-0"
+        placeholder="貼上內容成品連結(留空儲存=清空)"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+      />
+      <button
+        disabled={saving}
+        onClick={save}
+        className="px-2 py-0.5 rounded bg-foreground text-background disabled:opacity-50"
+      >
+        {saving ? "儲存中…" : "儲存"}
+      </button>
+      <button
+        disabled={saving}
+        onClick={() => {
+          setValue(session.產出連結 ?? "");
+          setEditing(false);
+          setError(null);
+        }}
+      >
+        取消
+      </button>
+      {error && <span className="text-red-600">{error}</span>}
+    </div>
   );
 }

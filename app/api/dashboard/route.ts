@@ -45,6 +45,7 @@ export async function GET(req: NextRequest) {
       項目用途: session?.項目用途 ?? null,
       狀態: session?.狀態 ?? null,
       是實驗: session?.項目用途 === "實驗",
+      所屬Session: d.所屬Session,
     };
   });
 

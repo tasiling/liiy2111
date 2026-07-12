@@ -84,6 +84,7 @@ export function mapSession(p: NotionPage) {
     項目用途: readSelect(p, "項目用途"),
     建立日期: readDateStart(p, "建立日期"),
     抽牌明細: readRelationIds(p, "抽牌明細"),
+    產出連結: readUrl(p, "產出連結"),
   };
 }
 

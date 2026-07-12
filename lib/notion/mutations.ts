@@ -7,7 +7,7 @@ import {
   type SessionStatus,
   type DetailStatus,
 } from "./schema";
-import { titleProp, richTextProp, selectProp, dateProp, relationProp } from "./properties";
+import { titleProp, richTextProp, selectProp, dateProp, relationProp, urlProp } from "./properties";
 import { queryAll } from "./queries";
 import { readTitle } from "./properties";
 
@@ -150,6 +150,19 @@ export async function updateDetailStatus(detailId: string, newStatus: DetailStat
     notion().pages.update({
       page_id: detailId,
       properties: { 明細狀態: selectProp(newStatus) },
+    })
+  );
+}
+
+// 「產出連結」欄位檢視與編輯(擁有者 2026-07-12 追加指示):支援內容完成後手動補登記連結,
+// 純粹欄位覆寫,不牽動狀態機。允許清空(傳空字串代表撤銷誤填的連結),Notion url 屬性
+// 清空須寫 null,不能寫空字串(空字串會被 API 判為不合法 URL 格式而拒絕)。
+export async function updateSessionOutputLink(sessionId: string, url: string) {
+  const trimmed = url.trim();
+  await withNotionRateLimit(() =>
+    notion().pages.update({
+      page_id: sessionId,
+      properties: { 產出連結: trimmed ? urlProp(trimmed) : { url: null } },
     })
   );
 }
