@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 type CalendarItem = {
@@ -11,6 +12,7 @@ type CalendarItem = {
   當場主題?: string;
   狀態: string | null;
   是實驗?: boolean;
+  所屬Session?: string | null;
 };
 
 type DashboardData = {
@@ -29,7 +31,6 @@ type DashboardData = {
 const STATUS_ORDER = ["已抽牌", "已指定用途", "解讀中", "已產出", "已交付"];
 const DETAIL_STATUS_ORDER = ["待產出", "已產出", "已交付"];
 const WEEKDAY_LABELS = ["日", "一", "二", "三", "四", "五", "六"];
-const MAX_PREVIEW_PER_DAY = 2;
 
 function shiftMonth(yearMonth: string, delta: number): string {
   const [y, m] = yearMonth.split("-").map(Number);
@@ -195,11 +196,11 @@ export default function DashboardPage() {
                   const isToday = cell.iso === data.today;
                   const isSelected = cell.iso === selectedDay;
                   return (
-                    <button
+                    <div
                       key={cell.iso}
                       onClick={() => setSelectedDay(cell.iso)}
                       className={[
-                        "min-h-16 sm:min-h-20 rounded border p-1 text-left align-top flex flex-col gap-0.5 overflow-hidden",
+                        "min-h-16 sm:min-h-20 rounded border p-1 text-left align-top flex flex-col gap-0.5 cursor-pointer",
                         cell.inMonth
                           ? "border-black/10 dark:border-white/15"
                           : "border-transparent opacity-35",
@@ -210,18 +211,27 @@ export default function DashboardPage() {
                       <span className={`text-xs ${isToday ? "font-bold text-blue-700 dark:text-blue-300" : ""}`}>
                         {cell.date.getDate()}
                       </span>
-                      {items.slice(0, MAX_PREVIEW_PER_DAY).map((it) => (
-                        <span
-                          key={it.id}
-                          className="text-[10px] leading-tight truncate rounded bg-zinc-100 dark:bg-zinc-800 px-1"
-                        >
-                          {it.標題}
-                        </span>
-                      ))}
-                      {items.length > MAX_PREVIEW_PER_DAY && (
-                        <span className="text-[10px] text-zinc-500">+{items.length - MAX_PREVIEW_PER_DAY} 更多</span>
+                      {/* 同日多筆任務全數堆疊顯示,不截斷——實測情境為每日 2–3 筆。 */}
+                      {items.map((it) =>
+                        it.所屬Session ? (
+                          <Link
+                            key={it.id}
+                            href={`/sessions?sessionId=${it.所屬Session}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-[10px] leading-tight truncate rounded bg-zinc-100 dark:bg-zinc-800 px-1 hover:bg-zinc-200 dark:hover:bg-zinc-700 underline decoration-dotted"
+                          >
+                            {it.標題}
+                          </Link>
+                        ) : (
+                          <span
+                            key={it.id}
+                            className="text-[10px] leading-tight truncate rounded bg-zinc-100 dark:bg-zinc-800 px-1"
+                          >
+                            {it.標題}
+                          </span>
+                        )
                       )}
-                    </button>
+                    </div>
                   );
                 })}
               </div>
@@ -251,7 +261,13 @@ function TaskRow({ item }: { item: CalendarItem }) {
   return (
     <li className="flex items-center gap-2 text-sm border border-black/5 dark:border-white/10 rounded px-3 py-2">
       <span className="text-xs px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800">{item.type}</span>
-      <span className="flex-1">{item.標題}</span>
+      {item.所屬Session ? (
+        <Link href={`/sessions?sessionId=${item.所屬Session}`} className="flex-1 underline decoration-dotted">
+          {item.標題}
+        </Link>
+      ) : (
+        <span className="flex-1">{item.標題}</span>
+      )}
       {item.項目用途 && <span className="text-xs text-zinc-500">{item.項目用途}</span>}
       {item.當場主題 && <span className="text-xs text-zinc-500">{item.當場主題}</span>}
       {item.狀態 && <span className="text-xs text-zinc-500">{item.狀態}</span>}
