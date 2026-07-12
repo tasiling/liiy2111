@@ -42,6 +42,9 @@ export default function RootLayout({
           <Link href="/generate" className="font-medium hover:underline">
             P8 組稿
           </Link>
+          <Link href="/feedback" className="font-medium hover:underline">
+            回饋快填
+          </Link>
         </nav>
         <main className="flex-1 p-4 max-w-3xl w-full mx-auto">{children}</main>
       </body>
