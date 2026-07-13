@@ -40,6 +40,10 @@ export function readUrl(page: { properties: AnyProps }, prop: string): string | 
   return page.properties?.[prop]?.url ?? null;
 }
 
+export function readCheckbox(page: { properties: AnyProps }, prop: string): boolean {
+  return page.properties?.[prop]?.checkbox ?? false;
+}
+
 // --- 寫入用的 property value builders ---
 
 export function titleProp(text: string) {
@@ -72,4 +76,8 @@ export function relationProp(pageIds: string[]) {
 
 export function urlProp(url: string) {
   return { url };
+}
+
+export function checkboxProp(value: boolean) {
+  return { checkbox: value };
 }

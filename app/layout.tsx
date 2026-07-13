@@ -48,6 +48,9 @@ export default function RootLayout({
           <Link href="/feedback" className="font-medium hover:underline">
             回饋快填
           </Link>
+          <Link href="/trpg" className="font-medium hover:underline ml-auto">
+            POV跑團系統
+          </Link>
         </nav>
         <main className="flex-1 p-4 max-w-3xl w-full mx-auto">{children}</main>
       </body>
