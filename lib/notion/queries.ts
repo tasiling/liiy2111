@@ -86,6 +86,7 @@ export function mapSession(p: NotionPage) {
     抽牌明細: readRelationIds(p, "抽牌明細"),
     產出連結: readUrl(p, "產出連結"),
     使用規則: readRelationIds(p, "使用規則"),
+    備註: readRichText(p, "備註"),
   };
 }
 

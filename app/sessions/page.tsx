@@ -9,6 +9,7 @@ import {
   normalizeDetailStatus,
   normalizeSessionStatus,
 } from "@/lib/notion/schema";
+import { addDays, toISODate } from "@/lib/date";
 
 const STATUS_ORDER: readonly string[] = SESSION_STATUS_ORDER;
 const 項目用途_OPTIONS: readonly string[] = SESSION_項目用途;
@@ -191,6 +192,7 @@ function SessionsPageInner() {
               {expandedId === s.id && (
                 <>
                   <DetailList
+                    sessionId={s.id}
                     details={details}
                     decks={decks}
                     onDrawn={() => refreshDetails(s.id)}
@@ -366,11 +368,13 @@ function SingleCreateForm({ onCreated }: { onCreated: () => void }) {
 }
 
 function DetailList({
+  sessionId,
   details,
   decks,
   onDrawn,
   onStatusChanged,
 }: {
+  sessionId: string;
   details: DetailRow[];
   decks: Deck[];
   onDrawn: () => void;
@@ -439,6 +443,8 @@ function DetailList({
         ))}
       </div>
 
+      <ShiftDatesPanel sessionId={sessionId} details={details} onShifted={onStatusChanged} />
+
       {selected.size > 0 && (
         <div className="flex items-center gap-2 text-xs mb-2">
           <span>已選 {selected.size} 筆</span>
@@ -484,6 +490,236 @@ function DetailList({
         ))}
       </ul>
     </div>
+  );
+}
+
+function daysBetween(aISO: string, bISO: string): number {
+  return Math.round((new Date(bISO).getTime() - new Date(aISO).getTime()) / 86400000);
+}
+
+// 批次日期平移(擁有者追加指示):只平移明細狀態=待產出者,已產出/已交付跳過並列出
+// (紀錄層只增不改)。用同一個天數整批加總,結構上自動保持原本的間隔。
+// 寫入前先在前端算好預覽(原日期→新日期),擁有者按「確認平移」才呼叫寫入 API。
+function ShiftDatesPanel({
+  sessionId,
+  details,
+  onShifted,
+}: {
+  sessionId: string;
+  details: DetailRow[];
+  onShifted: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<"date" | "offset">("date");
+  const [newStartDate, setNewStartDate] = useState("");
+  const [offsetInput, setOffsetInput] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [resultMsg, setResultMsg] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const shiftable = details.filter((d) => normalizeDetailStatus(d.明細狀態) === "待產出" && d.對應日期);
+  const skipped = details.filter((d) => !(normalizeDetailStatus(d.明細狀態) === "待產出" && d.對應日期));
+  const earliestShiftable = shiftable
+    .map((d) => d.對應日期 as string)
+    .sort()[0];
+
+  const offsetDays =
+    mode === "offset"
+      ? Number(offsetInput)
+      : newStartDate && earliestShiftable
+        ? daysBetween(earliestShiftable, newStartDate)
+        : NaN;
+
+  const canPreview = shiftable.length > 0 && Number.isFinite(offsetDays) && offsetDays !== 0;
+
+  async function confirmShift() {
+    setSubmitting(true);
+    setError(null);
+    setResultMsg(null);
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/shift-dates`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ offsetDays }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "平移失敗");
+      const failMsg = data.failed?.length
+        ? `,${data.failed.length} 筆失敗:${data.failed.map((f: { error: string }) => f.error).join(";")}`
+        : "";
+      const skipMsg = data.skipped?.length ? `,跳過 ${data.skipped.length} 筆已產出/已交付` : "";
+      setResultMsg(`已平移 ${data.succeeded?.length ?? 0} 筆${skipMsg}${failMsg}`);
+      setOpen(false);
+      setNewStartDate("");
+      setOffsetInput("");
+      onShifted();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (!open) {
+    return (
+      <div className="mb-2">
+        <button className="text-xs underline" onClick={() => setOpen(true)}>
+          整批平移日期…
+        </button>
+        {resultMsg && <span className="text-xs text-blue-700 dark:text-blue-400 ml-2">{resultMsg}</span>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-3 border border-black/10 dark:border-white/15 rounded p-2 flex flex-col gap-2">
+      <div className="flex items-center gap-3 text-xs">
+        <label className="flex items-center gap-1">
+          <input type="radio" checked={mode === "date"} onChange={() => setMode("date")} />
+          指定新起始日
+        </label>
+        <label className="flex items-center gap-1">
+          <input type="radio" checked={mode === "offset"} onChange={() => setMode("offset")} />
+          位移天數(±N)
+        </label>
+      </div>
+      {mode === "date" ? (
+        <input
+          type="date"
+          className="border rounded px-2 py-1 bg-transparent text-sm w-fit"
+          value={newStartDate}
+          onChange={(e) => setNewStartDate(e.target.value)}
+        />
+      ) : (
+        <input
+          type="number"
+          className="border rounded px-2 py-1 bg-transparent text-sm w-24"
+          placeholder="如 7 或 -3"
+          value={offsetInput}
+          onChange={(e) => setOffsetInput(e.target.value)}
+        />
+      )}
+
+      {shiftable.length === 0 && (
+        <p className="text-xs text-orange-600 dark:text-orange-400">
+          此批次沒有可平移的明細(全部已產出/已交付)。
+        </p>
+      )}
+
+      {canPreview && (
+        <div className="border-t border-black/5 dark:border-white/10 pt-2">
+          <p className="text-xs text-zinc-500 mb-1">
+            預覽({offsetDays > 0 ? "+" : ""}
+            {offsetDays} 天):
+          </p>
+          <ul className="flex flex-col gap-0.5 max-h-64 overflow-y-auto">
+            {shiftable.map((d) => (
+              <li key={d.id} className="text-xs font-mono">
+                {d.明細編號}:{d.對應日期} → {toISODate(addDays(new Date(d.對應日期 as string), offsetDays))}
+              </li>
+            ))}
+            {skipped.map((d) => (
+              <li key={d.id} className="text-xs font-mono text-zinc-400">
+                {d.明細編號}:{d.對應日期 ?? "無日期"}(不變——{normalizeDetailStatus(d.明細狀態)},跳過)
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="flex items-center gap-2">
+        <button
+          disabled={!canPreview || submitting}
+          onClick={confirmShift}
+          className="text-xs px-2 py-1 rounded bg-foreground text-background disabled:opacity-50"
+        >
+          {submitting ? "送出中…" : "確認平移"}
+        </button>
+        <button
+          disabled={submitting}
+          onClick={() => {
+            setOpen(false);
+            setError(null);
+          }}
+          className="text-xs underline"
+        >
+          取消
+        </button>
+        {error && <span className="text-xs text-red-600">{error}</span>}
+      </div>
+    </div>
+  );
+}
+
+// 單筆明細日期編輯(擁有者追加指示):同批次平移的限制,只有明細狀態=待產出時才能改;
+// 已產出/已交付純顯示,不給編輯入口(紀錄層只增不改)。
+function DetailDateEditor({ detail, onChanged }: { detail: DetailRow; onChanged: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(detail.對應日期 ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const editable = normalizeDetailStatus(detail.明細狀態) === "待產出";
+
+  async function save() {
+    if (!value) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/details/${detail.id}/date`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newDate: value }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "儲存失敗");
+      setEditing(false);
+      onChanged();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!editable) {
+    return <span className="text-xs text-zinc-500">{detail.對應日期}(已鎖定)</span>;
+  }
+
+  if (!editing) {
+    return (
+      <span className="text-xs text-zinc-500">
+        {detail.對應日期}{" "}
+        <button className="underline" onClick={() => setEditing(true)}>
+          編輯
+        </button>
+      </span>
+    );
+  }
+
+  return (
+    <span className="flex items-center gap-1 text-xs">
+      <input
+        type="date"
+        className="border rounded px-1 py-0.5 bg-transparent"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+      />
+      <button disabled={saving} onClick={save} className="underline">
+        {saving ? "儲存中…" : "儲存"}
+      </button>
+      <button
+        disabled={saving}
+        onClick={() => {
+          setValue(detail.對應日期 ?? "");
+          setEditing(false);
+          setError(null);
+        }}
+        className="underline"
+      >
+        取消
+      </button>
+      {error && <span className="text-red-600">{error}</span>}
+    </span>
   );
 }
 
@@ -551,7 +787,7 @@ function DetailRowItem({
     <li className="text-sm flex flex-wrap items-center gap-2">
       <input type="checkbox" checked={selected} onChange={onToggleSelect} />
       <span className="font-mono text-xs">{detail.明細編號}</span>
-      <span className="text-xs text-zinc-500">{detail.對應日期}</span>
+      <DetailDateEditor detail={detail} onChanged={onStatusChanged} />
       <span className="text-xs px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800">
         {normalizeDetailStatus(detail.明細狀態)}
       </span>
