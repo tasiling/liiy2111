@@ -21,7 +21,7 @@ import {
   relationProp,
   urlProp,
 } from "./properties";
-import { queryAll } from "./queries";
+import { queryAll, getSession } from "./queries";
 import { readTitle } from "./properties";
 
 // Session 編號格式:S-YYYYMMDD-流水號(總綱 DB-03)。流水號以當日已存在筆數 +1 計算。
@@ -163,6 +163,31 @@ export async function updateDetailStatus(detailId: string, newStatus: DetailStat
     notion().pages.update({
       page_id: detailId,
       properties: { 明細狀態: selectProp(newStatus) },
+    })
+  );
+}
+
+// 明細日期編輯/批次平移(擁有者 2026-07-13 追加指示):只允許明細狀態=待產出者變動
+// 日期——已產出/已交付是歷史紀錄,只增不改,呼叫端在此之前須先驗證狀態。
+export async function updateDetailDate(detailId: string, newDateISO: string) {
+  await withNotionRateLimit(() =>
+    notion().pages.update({
+      page_id: detailId,
+      properties: { 對應日期: dateProp(newDateISO) },
+    })
+  );
+}
+
+// Session 表頭「備註」追加一行異動軌跡(不覆蓋既有備註,append),用於日期平移/
+// 單筆日期編輯後留下可追溯的紀錄。
+export async function appendSessionNote(sessionId: string, line: string) {
+  const session = await getSession(sessionId);
+  const existing = session.備註?.trim();
+  const updated = existing ? `${existing}\n${line}` : line;
+  await withNotionRateLimit(() =>
+    notion().pages.update({
+      page_id: sessionId,
+      properties: { 備註: richTextProp(updated) },
     })
   );
 }
