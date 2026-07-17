@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
+import { pageLabel } from "@/lib/labels";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -31,22 +32,22 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <nav className="flex gap-4 px-4 py-3 border-b border-black/10 dark:border-white/15 text-sm">
           <Link href="/" className="font-medium hover:underline">
-            主控台
+            {pageLabel("P1")}
           </Link>
           <Link href="/production-day" className="font-medium hover:underline">
-            生產日工作台
+            {pageLabel("P3")}
           </Link>
           <Link href="/sessions" className="font-medium hover:underline">
-            Session 工作站
+            {pageLabel("P5")}
           </Link>
           <Link href="/expand" className="font-medium hover:underline">
-            序列展開
+            {pageLabel("P2")}
           </Link>
           <Link href="/generate" className="font-medium hover:underline">
-            P8 組稿
+            {pageLabel("P8")}
           </Link>
           <Link href="/feedback" className="font-medium hover:underline">
-            回饋快填
+            {pageLabel("P6")}
           </Link>
         </nav>
         <main className="flex-1 p-4 max-w-3xl w-full mx-auto">{children}</main>

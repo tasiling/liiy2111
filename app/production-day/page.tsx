@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { pageLabel } from "@/lib/labels";
 
 // P3 生產日工作台(委派書 §四,第二期):照《大生產日 SOP v0.9.2》步驟順序做成引導流程
 // (步驟清單+當前步驟高亮)。步驟內容為靜態文字,不持久化「目前第幾步」——每次開工
@@ -19,14 +20,14 @@ const STEPS: {
     title: "☆ 開機儀式:回顧上期回饋",
     time: "20 分",
     desc: "讀上期回饋紀錄與待審提案。有累積滿三次的同類問題→標記,生產日結束後再走提案流程,當場不改規則。",
-    links: [{ label: "回饋快填", href: "/feedback" }],
+    links: [{ label: pageLabel("P6"), href: "/feedback" }],
   },
   {
     id: 1,
     title: "☆ 月能量流",
     time: "60–90 分",
     desc: "抽月能量流牌陣→建 Session(項目=能量流)+明細→套 R-能量流規則解讀→產出月主題包草稿(主題名、能量關鍵字、深度討論題目、每日互動方向)。",
-    links: [{ label: "Session 工作站", href: "/sessions" }],
+    links: [{ label: pageLabel("P5"), href: "/sessions" }],
   },
   {
     id: 2,
@@ -39,19 +40,19 @@ const STEPS: {
     id: 3,
     title: "☆ 任務展開",
     time: "30 分",
-    desc: "依 DB-06/07 序列模板+窗口內節點展開任務清單;知識庫比對(下方清單)以月主題標籤撈 DB-14 存貨,匹配者排入;二更測驗維度/方法挑選在 P8 組稿的心理測驗選項表單(App 只列清單,不代選)。",
+    desc: `依 DB-06/07 序列模板+窗口內節點展開任務清單;知識庫比對(下方清單)以月主題標籤撈 DB-14 存貨,匹配者排入;二更測驗維度/方法挑選在${pageLabel("P8")}的心理測驗選項表單(App 只列清單,不代選)。`,
     widget: "knowledge",
     links: [
-      { label: "序列展開", href: "/expand" },
-      { label: "P8 組稿(心理測驗選項)", href: "/generate" },
+      { label: pageLabel("P2"), href: "/expand" },
+      { label: `${pageLabel("P8")}(心理測驗選項)`, href: "/generate" },
     ],
   },
   {
     id: 4,
     title: "生產(核心工作段)",
     time: "—",
-    desc: "固定順序:①共振會序列文 ②月能量流發布文+活動總預告 ③三更邀請文 ④二更心理測驗 ⑤其他事件序列文。每篇:套規則+填素材插槽→生成(手動/P8 組稿/P8 生成)→驗收(四維評分)→過=已產出。",
-    links: [{ label: "P8 組稿", href: "/generate" }],
+    desc: `固定順序:①共振會序列文 ②月能量流發布文+活動總預告 ③三更邀請文 ④二更心理測驗 ⑤其他事件序列文。每篇:套規則+填素材插槽→生成(手動/${pageLabel("P8")}/${pageLabel("P8")}生成)→驗收(四維評分)→過=已產出。`,
+    links: [{ label: pageLabel("P8"), href: "/generate" }],
   },
   {
     id: 5,
@@ -59,8 +60,8 @@ const STEPS: {
     time: "30 分",
     desc: "內容包整理(定稿文字+Canva 模板編號+發布日期)→狀態改「已交付」→處理第 0 步標記的提案→預約小生產日→生產日自評(一筆回饋)。",
     links: [
-      { label: "Session 工作站", href: "/sessions" },
-      { label: "回饋快填", href: "/feedback" },
+      { label: pageLabel("P5"), href: "/sessions" },
+      { label: pageLabel("P6"), href: "/feedback" },
     ],
   },
 ];
@@ -124,7 +125,7 @@ export default function ProductionDayPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold">P3 生產日工作台</h1>
+        <h1 className="text-lg font-semibold">{pageLabel("P3")}</h1>
         <label className="flex items-center gap-2 text-sm">
           月份
           <input

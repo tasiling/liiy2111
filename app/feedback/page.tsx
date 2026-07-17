@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { FEEDBACK_對象類型, FEEDBACK_QUESTION_TAGS, FEEDBACK_PROPOSAL_THRESHOLD } from "@/lib/notion/schema";
+import { pageLabel } from "@/lib/labels";
 
 const 對象類型_OPTIONS: readonly string[] = FEEDBACK_對象類型;
 const TAG_OPTIONS: readonly string[] = FEEDBACK_QUESTION_TAGS;
@@ -105,7 +106,7 @@ export default function FeedbackPage() {
 
   return (
     <div className="flex flex-col gap-6 max-w-md">
-      <h1 className="text-lg font-semibold">P6 回饋快填</h1>
+      <h1 className="text-lg font-semibold">{pageLabel("P6")}</h1>
       {result && <p className="text-sm text-green-700 dark:text-green-400">{result}</p>}
       {error && <p className="text-sm text-red-600">{error}</p>}
 

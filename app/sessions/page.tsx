@@ -10,6 +10,7 @@ import {
   normalizeSessionStatus,
 } from "@/lib/notion/schema";
 import { addDays, toISODate } from "@/lib/date";
+import { pageLabel } from "@/lib/labels";
 
 const STATUS_ORDER: readonly string[] = SESSION_STATUS_ORDER;
 const 項目用途_OPTIONS: readonly string[] = SESSION_項目用途;
@@ -132,7 +133,7 @@ function SessionsPageInner() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-lg font-semibold">P5 Session 工作站</h1>
+      <h1 className="text-lg font-semibold">{pageLabel("P5")}</h1>
       {msg && <p className="text-sm text-blue-700 dark:text-blue-400">{msg}</p>}
 
       <BatchCreateForm onCreated={refreshSessions} />

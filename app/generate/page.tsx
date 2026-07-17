@@ -3,6 +3,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { buildP8ZeroSection, type ServiceDivinationChoice } from "@/lib/generate/p8zero";
 import { SEVEN_METHODS } from "@/lib/notion/schema";
+import { pageLabel } from "@/lib/labels";
 
 type ServiceDivinationEntry = ServiceDivinationChoice & { id: string };
 
@@ -247,7 +248,7 @@ export default function GeneratePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-lg font-semibold">P8 生成工作台 — 階段一・一鍵組稿</h1>
+      <h1 className="text-lg font-semibold">{pageLabel("P8")} — 階段一・一鍵組稿</h1>
       <p className="text-sm text-zinc-500">
         自動組裝五項輸入(牌卡資料、對應規則現行版、月主題包、語氣指引現行版、輸出格式)成完整提示詞,複製後貼入任何 AI
         對話生成。純讀取,不寫入 Notion,零 API 成本。缺一律報錯,不會靜默省略。
