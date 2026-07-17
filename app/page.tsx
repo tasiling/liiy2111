@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { pageLabel } from "@/lib/labels";
 
 type CalendarItem = {
   type: "明細" | "場次";
@@ -113,6 +114,7 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <h1 className="text-lg font-semibold">{pageLabel("P1")}</h1>
       <section>
         <div className="flex items-center justify-between mb-2">
           <button
@@ -121,7 +123,7 @@ export default function DashboardPage() {
           >
             ← 上月
           </button>
-          <h1 className="text-lg font-semibold">{yearMonth}</h1>
+          <h2 className="text-lg font-semibold">{yearMonth}</h2>
           <button
             className="px-3 py-1 rounded border border-black/15 dark:border-white/20 text-sm"
             onClick={() => setYearMonth((m) => shiftMonth(m, 1))}
