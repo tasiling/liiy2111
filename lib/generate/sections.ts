@@ -7,6 +7,8 @@ import {
   listToneGuideCandidates,
   extractNotionPageId,
   fetchNotionPagePlainText,
+  getDetail,
+  listDetailsForSession,
   type mapRule,
   type mapMonthlyTheme,
   type mapKnowledge,
@@ -14,7 +16,29 @@ import {
 import { parseDrawOrder } from "./cards";
 import { pickLatestToneGuide } from "./toneGuide";
 
-type Result<T> = { ok: true; value: T } | { ok: false; missing: string[] };
+export type Result<T> = { ok: true; value: T } | { ok: false; missing: string[] };
+
+// 明細挑選:單筆 Session 自動取用唯一明細;批次 Session 需指定 detailId(逐日生成)。
+// 單篇組稿(compose.ts)與方法系列組稿(composeMethod.ts)共用,不重寫兩份。
+export async function resolveDetailForSession(
+  sessionId: string,
+  detailId?: string
+): Promise<Result<Awaited<ReturnType<typeof getDetail>>>> {
+  if (detailId) {
+    return { ok: true, value: await getDetail(detailId) };
+  }
+  const details = await listDetailsForSession(sessionId);
+  if (details.length === 1) {
+    return { ok: true, value: details[0] };
+  }
+  if (details.length === 0) {
+    return { ok: false, missing: ["Session 底下沒有任何明細,無法取得牌卡資料"] };
+  }
+  return {
+    ok: false,
+    missing: [`Session 為批次模式(${details.length} 筆明細),請改用批次組稿,或指定 detailId 組單篇稿`],
+  };
+}
 
 // 1. 牌卡資料:以「抽出順序」為權威順序,逆位以 R 後綴記法解析。
 export async function resolveCardsSection(抽出順序: string): Promise<Result<string>> {
@@ -72,9 +96,11 @@ export async function resolveTheme(
   return { ok: true, value: theme };
 }
 
-// 4. 語氣指引現行版(標題以「語氣指引」開頭、核可狀態=已核可,取最新版;連結有值則取回全文)
+// 4. 語氣指引現行版(標題以「語氣指引」開頭、核可狀態=已核可,取最新版;連結有值則取回全文)。
+// `sourcePageId` 一併回傳:全文實際來自哪一頁(連結指向頁、或本筆頁面自身),供後續需要
+// 進一步解析該頁內結構化區塊的場景使用(如方法對照表),不必重新判斷一次。
 export async function resolveToneGuide(): Promise<
-  Result<{ guide: ReturnType<typeof mapKnowledge>; content: string }>
+  Result<{ guide: ReturnType<typeof mapKnowledge>; content: string; sourcePageId: string }>
 > {
   const candidates = await listToneGuideCandidates();
   const toneGuide = pickLatestToneGuide(candidates);
@@ -96,10 +122,16 @@ export async function resolveToneGuide(): Promise<
     if (!text) {
       return { ok: false, missing: [`語氣指引「${toneGuide.標題}」依連結取回的全文為空`] };
     }
-    return { ok: true, value: { guide: toneGuide, content: text } };
+    return { ok: true, value: { guide: toneGuide, content: text, sourcePageId: pageId } };
   }
   if (toneGuide.內容) {
-    return { ok: true, value: { guide: toneGuide, content: toneGuide.內容 } };
+    return { ok: true, value: { guide: toneGuide, content: toneGuide.內容, sourcePageId: toneGuide.id } };
   }
-  return { ok: false, missing: [`語氣指引「${toneGuide.標題}」的「內容」與「連結」皆為空`] };
+  // 「內容」「連結」皆空:視為全文直接寫在本筆頁面內文(本筆即單一本源),依本筆頁面 ID
+  // 取回全文——不是額外特例,是「內容/連結兩個入口都沒有指到別處」時最後的資料落點。
+  const ownText = await fetchNotionPagePlainText(toneGuide.id);
+  if (!ownText) {
+    return { ok: false, missing: [`語氣指引「${toneGuide.標題}」的「內容」「連結」與頁面內文皆為空`] };
+  }
+  return { ok: true, value: { guide: toneGuide, content: ownText, sourcePageId: toneGuide.id } };
 }
