@@ -409,6 +409,14 @@ export function extractNotionPageId(url: string): string | null {
   return plain ? plain[0] : null;
 }
 
+// table/table_row 區塊的文字不在 `block[block.type].rich_text`(改放在 table_row 的
+// `cells`,每格是一個 rich_text 陣列),一般 walk 邏輯抓不到,需另外處理,否則頁面內任何
+// 表格(如語氣指引的方法對照表)全文擷取時會被靜默漏掉。
+function tableRowText(block: NotionPage): string {
+  const cells = (block.table_row?.cells ?? []) as { plain_text: string }[][];
+  return cells.map((cell) => cell.map((t) => t.plain_text).join("")).join(" | ");
+}
+
 export async function fetchNotionPagePlainText(pageId: string): Promise<string> {
   async function walk(blockId: string): Promise<string[]> {
     const lines: string[] = [];
@@ -418,6 +426,11 @@ export async function fetchNotionPagePlainText(pageId: string): Promise<string> 
         notion().blocks.children.list({ block_id: blockId, start_cursor: cursor, page_size: 100 })
       );
       for (const block of res.results as NotionPage[]) {
+        if (block.type === "table_row") {
+          const text = tableRowText(block);
+          if (text) lines.push(text);
+          continue;
+        }
         const richText = block[block.type]?.rich_text;
         if (Array.isArray(richText)) {
           const text = richText.map((t: { plain_text: string }) => t.plain_text).join("");
@@ -432,4 +445,52 @@ export async function fetchNotionPagePlainText(pageId: string): Promise<string> 
     return lines;
   }
   return (await walk(pageId)).join("\n");
+}
+
+// 讀取頁面內所有 table 區塊,回傳結構化的列x欄(第 0 列=表頭),供需要依欄位標題比對
+// 解析的場景使用(如語氣指引「方法對照表」),不必自行重新走一次區塊樹。
+export type NotionTable = string[][];
+
+export async function fetchNotionPageTables(pageId: string): Promise<NotionTable[]> {
+  const tables: NotionTable[] = [];
+
+  async function walkRows(tableBlockId: string): Promise<NotionTable> {
+    const rows: NotionTable = [];
+    let cursor: string | undefined = undefined;
+    do {
+      const res = await withNotionRateLimit(() =>
+        notion().blocks.children.list({ block_id: tableBlockId, start_cursor: cursor, page_size: 100 })
+      );
+      for (const block of res.results as NotionPage[]) {
+        if (block.type === "table_row") {
+          const cells = (block.table_row?.cells ?? []) as { plain_text: string }[][];
+          rows.push(cells.map((cell) => cell.map((t) => t.plain_text).join("")));
+        }
+      }
+      cursor = res.has_more ? (res.next_cursor ?? undefined) : undefined;
+    } while (cursor);
+    return rows;
+  }
+
+  async function walk(blockId: string): Promise<void> {
+    let cursor: string | undefined = undefined;
+    do {
+      const res = await withNotionRateLimit(() =>
+        notion().blocks.children.list({ block_id: blockId, start_cursor: cursor, page_size: 100 })
+      );
+      for (const block of res.results as NotionPage[]) {
+        if (block.type === "table" && block.has_children) {
+          tables.push(await walkRows(block.id));
+          continue;
+        }
+        if (block.has_children) {
+          await walk(block.id);
+        }
+      }
+      cursor = res.has_more ? (res.next_cursor ?? undefined) : undefined;
+    } while (cursor);
+  }
+
+  await walk(pageId);
+  return tables;
 }

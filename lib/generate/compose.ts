@@ -1,7 +1,13 @@
 // P8 階段一・一鍵組稿(單篇):純讀取 + 純文字組裝,不呼叫任何 AI、不寫入 Notion(零 API 成本)。
 // 五項輸入缺一即報錯,不得靜默省略(委派書 P8 規格硬規定)。
-import { getSession, getDetail, listDetailsForSession } from "@/lib/notion/queries";
-import { resolveCardsSection, resolveRule, resolveTheme, resolveToneGuide } from "./sections";
+import { getSession } from "@/lib/notion/queries";
+import {
+  resolveCardsSection,
+  resolveDetailForSession,
+  resolveRule,
+  resolveTheme,
+  resolveToneGuide,
+} from "./sections";
 import { buildP8ZeroSection, type P8ZeroInput } from "./p8zero";
 
 export type ComposeInput = {
@@ -18,23 +24,9 @@ export async function composePrompt(input: ComposeInput): Promise<ComposeResult>
 
   const session = await getSession(input.sessionId);
 
-  // 決定要用哪一筆明細:批次 Session 需指定 detailId(逐日生成,SOP 小生產日步驟 2);
-  // 單筆 Session 只有一筆明細,自動取用。
-  let detail: Awaited<ReturnType<typeof getDetail>> | null = null;
-  if (input.detailId) {
-    detail = await getDetail(input.detailId);
-  } else {
-    const details = await listDetailsForSession(input.sessionId);
-    if (details.length === 1) {
-      detail = details[0];
-    } else if (details.length === 0) {
-      missing.push("Session 底下沒有任何明細,無法取得牌卡資料");
-    } else {
-      missing.push(
-        `Session 為批次模式(${details.length} 筆明細),請改用批次組稿,或指定 detailId 組單篇稿`
-      );
-    }
-  }
+  const detailResult = await resolveDetailForSession(input.sessionId, input.detailId);
+  if (!detailResult.ok) missing.push(...detailResult.missing);
+  const detail = detailResult.ok ? detailResult.value : null;
 
   const cardsResult = detail ? await resolveCardsSection(detail.抽出順序) : null;
   if (cardsResult && !cardsResult.ok) missing.push(...cardsResult.missing);

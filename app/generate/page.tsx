@@ -95,6 +95,16 @@ export default function GeneratePage() {
   const [selectedSdId, setSelectedSdId] = useState("");
   const [selectedMethod, setSelectedMethod] = useState("");
 
+  // 空雨傘八方法・日光互動貼文組稿:方法清單動態取自語氣指引全文對照表,不寫死於程式碼。
+  const [versionOptions, setVersionOptions] = useState<{ 版型名: string; 傘型態: string }[]>([]);
+  const [versionOptionsMissing, setVersionOptionsMissing] = useState<string[] | null>(null);
+  const [selectedVersionName, setSelectedVersionName] = useState("");
+  const [versionDetailId, setVersionDetailId] = useState("");
+  const [versionPrompt, setVersionPrompt] = useState<string | null>(null);
+  const [versionMissing, setVersionMissing] = useState<string[] | null>(null);
+  const [versionLoading, setVersionLoading] = useState(false);
+  const [versionCopied, setVersionCopied] = useState(false);
+
   useEffect(() => {
     fetch("/api/sessions")
       .then((r) => r.json())
@@ -102,6 +112,12 @@ export default function GeneratePage() {
     fetch("/api/monthly-themes")
       .then((r) => r.json())
       .then((d) => setThemes(d.themes ?? []));
+    fetch("/api/generate/methods")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.ok) setVersionOptions(d.methods ?? []);
+        else setVersionOptionsMissing(d.missing ?? ["八方法對照表載入失敗"]);
+      });
   }, []);
 
   const selectedSession = sessions.find((s) => s.id === sessionId);
@@ -131,6 +147,10 @@ export default function GeneratePage() {
     setBatchMissing(null);
     setSelectedSdId("");
     setSelectedMethod("");
+    setSelectedVersionName("");
+    setVersionDetailId("");
+    setVersionPrompt(null);
+    setVersionMissing(null);
     const session = sessions.find((s) => s.id === newId);
     if (newId && session?.模式 === "批次") {
       const res = await fetch(`/api/sessions/${newId}/details`);
@@ -244,6 +264,38 @@ export default function GeneratePage() {
   async function copyText(text: string, idx: number) {
     await navigator.clipboard.writeText(text);
     setCopiedIdx(idx);
+  }
+
+  async function composeVersion() {
+    setVersionLoading(true);
+    setVersionPrompt(null);
+    setVersionMissing(null);
+    setVersionCopied(false);
+    try {
+      const res = await fetch("/api/generate/compose-method", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId,
+          detailId: versionDetailId || undefined,
+          method: selectedVersionName,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        setVersionMissing(data.missing ?? [data.error ?? "組稿失敗"]);
+        return;
+      }
+      setVersionPrompt(data.prompt);
+    } finally {
+      setVersionLoading(false);
+    }
+  }
+
+  async function copyVersionPrompt() {
+    if (!versionPrompt) return;
+    await navigator.clipboard.writeText(versionPrompt);
+    setVersionCopied(true);
   }
 
   return (
@@ -426,6 +478,104 @@ export default function GeneratePage() {
           </>
         )}
       </section>
+
+      {sessionId && (
+        <section className="border border-black/10 dark:border-white/15 rounded-lg p-4 flex flex-col gap-3 text-sm">
+          <h2 className="font-medium">方法系列組稿(空雨傘八法)</h2>
+          <p className="text-xs text-zinc-500">
+            五項輸入:牌卡資料、對應規則現行版、語氣指引全文、所選方法的空雨傘三段命名與傘段型態、輸出格式,缺一律報錯。
+            方法按鈕動態取自語氣指引全文的對照表,不寫死於程式碼;升版只換資料,按鈕內容自動跟著變。
+          </p>
+
+          {versionOptionsMissing && (
+            <ul className="list-disc list-inside text-red-700 dark:text-red-400 text-xs">
+              {versionOptionsMissing.map((m, i) => (
+                <li key={i}>{m}</li>
+              ))}
+            </ul>
+          )}
+
+          {versionOptions.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {versionOptions.map((m) => (
+                <button
+                  key={m.版型名}
+                  onClick={() => setSelectedVersionName(m.版型名)}
+                  title={`傘型態:${m.傘型態}`}
+                  className={`px-3 py-1.5 rounded border text-xs ${
+                    selectedVersionName === m.版型名
+                      ? "bg-foreground text-background border-foreground"
+                      : "border-black/15 dark:border-white/20"
+                  }`}
+                >
+                  {m.版型名}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {details.length > 0 && (
+            <label className="flex flex-col gap-1">
+              明細(挑選要組稿的那一天;單筆 Session 可留空自動取用)
+              <select
+                className="border rounded px-2 py-1 bg-transparent"
+                value={versionDetailId}
+                onChange={(e) => setVersionDetailId(e.target.value)}
+              >
+                <option value="">自動取用(批次 Session 需指定一筆)</option>
+                {details.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.明細編號}({d.對應日期}){d.抽出順序 ? ` — ${d.抽出順序}` : "(尚未抽牌)"}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          <button
+            disabled={!selectedVersionName || versionLoading}
+            onClick={composeVersion}
+            className="self-start px-3 py-1.5 rounded bg-foreground text-background text-sm disabled:opacity-50"
+          >
+            {versionLoading ? "組裝中…" : "組出方法提示詞"}
+          </button>
+
+          {versionMissing && (
+            <div className="border border-red-300 dark:border-red-800 rounded-lg p-3">
+              <h3 className="font-medium mb-2 text-red-700 dark:text-red-400 text-xs">缺少以下項目,無法組稿:</h3>
+              <ul className="list-disc list-inside text-red-700 dark:text-red-400 text-xs">
+                {versionMissing.map((m, i) => (
+                  <li key={i}>{m}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {versionPrompt && (
+            <div className="border border-black/10 dark:border-white/15 rounded-lg p-3">
+              <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-medium text-xs">組好的方法提示詞({selectedVersionName})</h3>
+                  <span className="px-2 py-0.5 rounded text-xs bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                    生成品狀態:待審核
+                  </span>
+                </div>
+                <button
+                  onClick={copyVersionPrompt}
+                  className="px-3 py-1 rounded border border-black/15 dark:border-white/20 text-xs"
+                >
+                  {versionCopied ? "已複製" : "複製"}
+                </button>
+              </div>
+              <textarea
+                readOnly
+                value={versionPrompt}
+                className="w-full h-96 text-xs font-mono border rounded p-2 bg-transparent"
+              />
+            </div>
+          )}
+        </section>
+      )}
 
       {missing && (
         <section className="border border-red-300 dark:border-red-800 rounded-lg p-4 text-sm">
