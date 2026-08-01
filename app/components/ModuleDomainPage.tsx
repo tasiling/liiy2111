@@ -16,6 +16,7 @@ export default function ModuleDomainPage({
   actions,
   space,
   extra,
+  tabLinks,
 }: {
   title: string;
   lead: string;
@@ -25,6 +26,8 @@ export default function ModuleDomainPage({
   space: SpaceKey;
   /** 既有功能連結區(擁有者指示重新掛進場域的真實頁面),顯示在雛形內容之前。 */
   extra?: React.ReactNode;
+  /** 對應 tabs 索引:該頁籤若有真實功能頁面,填入路徑,新增按鈕會導頁過去取代模擬新增。 */
+  tabLinks?: (string | null)[];
 }) {
   const [tabIndex, setTabIndex] = useState(0);
   const { entries, openQuickAdd, startTimerFromSpace } = useDojo();
@@ -68,12 +71,18 @@ export default function ModuleDomainPage({
           <EntryCard key={e.id} entry={e} />
         ))}
         <div className="two">
-          <button
-            className="primary"
-            onClick={() => openQuickAdd({ presetSpace: space, presetKind: items[tabIndex] })}
-          >
-            {actions[tabIndex] || "新增紀錄"}
-          </button>
+          {tabLinks?.[tabIndex] ? (
+            <button className="primary" onClick={() => router.push(tabLinks[tabIndex]!)}>
+              進入{tabs[tabIndex]} →
+            </button>
+          ) : (
+            <button
+              className="primary"
+              onClick={() => openQuickAdd({ presetSpace: space, presetKind: items[tabIndex] })}
+            >
+              {actions[tabIndex] || "新增紀錄"}
+            </button>
+          )}
           <button onClick={startTimerHere}>◷ 在此計時</button>
         </div>
       </div>

@@ -114,6 +114,11 @@ export function mapDetail(p: NotionPage) {
     抽出順序: readRichText(p, "抽出順序"),
     所屬Session: readRelationIds(p, "所屬 Session")[0] ?? null,
     明細狀態: readSelect(p, "明細狀態"),
+    // 日上三更・指令產生器(2026-08-01 擁有者於 Notion 新增):草稿文字與明細層級的
+    // 產出連結。批次一次多篇時,每篇各自一則貼文,Session 表頭的產出連結欄裝不下
+    // 多篇,改用這裡——Session 表頭的產出連結留給單筆模式或不使用。
+    草稿: readRichText(p, "草稿"),
+    產出連結: readUrl(p, "產出連結"),
   };
 }
 
@@ -138,6 +143,22 @@ export async function listDetailsInRange(startISO: string, endISO: string) {
     ],
   });
   return pages.map(mapDetail);
+}
+
+// 日上三更指令產生器:進入頁面先列出全部待產出明細(依對應日期排序)。
+// 空值一律視同「待產出」(既有的防禦性 fallback 規則),用 or 條件把「明細狀態=待產出」
+// 與「明細狀態未填」都納入,避免舊資料或任何管道漏寫的空值明細變成黑數,清單看不到。
+// 待審核者一併列入(2026-08-01 擁有者新增此狀態):已存草稿、等擁有者確認發布的
+// 明細也要能在清單中找到、接續完成,不是只能在建立瀏覽器那次的當下完成。
+export async function listPendingDetails() {
+  const pages = await queryAll(DATA_SOURCES.DB04_抽牌明細, {
+    or: [
+      { property: "明細狀態", select: { equals: "待產出" } },
+      { property: "明細狀態", select: { equals: "待審核" } },
+      { property: "明細狀態", select: { is_empty: true } },
+    ],
+  });
+  return pages.map(mapDetail).sort((a, b) => (a.對應日期 ?? "").localeCompare(b.對應日期 ?? ""));
 }
 
 // --- DB-06 固定項目註冊表 ---
