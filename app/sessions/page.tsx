@@ -132,7 +132,7 @@ function SessionsPageInner() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 p-4">
       <h1 className="text-lg font-semibold">{pageLabel("P5")}</h1>
       {msg && <p className="text-sm text-blue-700 dark:text-blue-400">{msg}</p>}
 
