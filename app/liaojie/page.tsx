@@ -2,9 +2,9 @@ import ModuleDomainPage from "../components/ModuleDomainPage";
 import ExistingFeatureLinks from "../components/ExistingFeatureLinks";
 
 // 聊解室(雛形 liaojie()的等價實作)。擁有者指示:任務管理站、組稿台、序列展開
-// 掛進這裡。總覽台(P1)委派書未指定歸屬場域,判斷它是生產進度總覽,性質上最接近
-// 聊解室(服務與對外工作場域),先掛在這裡——這是我方的判斷,非明確指示,若擁有者
-// 認為應該放別處或獨立,請告知調整。
+// 掛進這裡。總覽台(P1)擁有者裁決(2026-08-01)改掛居所底下的「看整月」子頁
+// (/overview),不在這裡——行事曆與完成度屬於「今天要做什麼」,是居所的職責,
+// 不是工作場域的。
 export default function LiaojiePage() {
   return (
     <ModuleDomainPage
@@ -20,7 +20,6 @@ export default function LiaojiePage() {
             { label: "任務管理站", href: "/sessions" },
             { label: "組稿台", href: "/generate" },
             { label: "序列展開", href: "/expand" },
-            { label: "總覽台", href: "/overview" },
           ]}
         />
       }

@@ -1,5 +1,9 @@
 "use client";
 
+// 居所底下的「看整月」子頁(擁有者裁決 2026-08-01):行事曆與完成度儀表是數字儀表,
+// 居所首頁明令禁止顯示這類內容,所以獨立成子頁,想看才點進來。今日待辦邏輯已移到
+// 居所首頁本身,這裡不再重複顯示。
+
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { pageLabel } from "@/lib/labels";
@@ -114,7 +118,12 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6 p-4">
-      <h1 className="text-lg font-semibold">{pageLabel("P1")}</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-lg font-semibold">{pageLabel("P1")}</h1>
+        <Link href="/" className="text-sm underline text-zinc-500">
+          ← 回居所
+        </Link>
+      </div>
       <section>
         <div className="flex items-center justify-between mb-2">
           <button
@@ -167,18 +176,6 @@ export default function DashboardPage() {
               </div>
             ))}
           </div>
-        </section>
-      )}
-
-      {data && (
-        <section className="border border-black/10 dark:border-white/15 rounded-lg p-4">
-          <h2 className="font-medium mb-3">今日待辦({data.today})</h2>
-          {data.todayTasks.length === 0 && <p className="text-sm text-zinc-500">今天沒有到期任務。</p>}
-          <ul className="flex flex-col gap-2">
-            {data.todayTasks.map((t) => (
-              <TaskRow key={t.id} item={t} />
-            ))}
-          </ul>
         </section>
       )}
 
