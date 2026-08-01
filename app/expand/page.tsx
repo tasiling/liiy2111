@@ -107,7 +107,7 @@ export default function ExpandPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 p-4">
       <h1 className="text-lg font-semibold">{pageLabel("P2")}</h1>
       <p className="text-sm text-zinc-500">
         讀取 DB-06/07/15,依錨點(首場/每場/末場)計算實際日期。展開結果先預覽,勾選確認後才寫入 Notion。

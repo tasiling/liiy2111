@@ -105,7 +105,7 @@ export default function FeedbackPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6 max-w-md">
+    <div className="flex flex-col gap-6 max-w-md p-4">
       <h1 className="text-lg font-semibold">{pageLabel("P6")}</h1>
       {result && <p className="text-sm text-green-700 dark:text-green-400">{result}</p>}
       {error && <p className="text-sm text-red-600">{error}</p>}

@@ -1,0 +1,381 @@
+/* 行光道場介面雛形 v1 移植(擁有者提供的 HTML 原型)。
+   直接沿用雛形的 CSS 變數、版面結構、元件樣式,不重新設計、不「順手優化」。
+   唯一調整:所有選擇器加上 .dojo 前綴做範圍限定,避免影響尚未重新編排進場域的
+   既有頁面(如果之後這些頁面也掛進場域殼層,屆時再考慮拿掉這層限定)。 */
+
+.dojo {
+  --bg: #f6f1e6;
+  --paper: #fdfaf3;
+  --ink: #2f2a22;
+  --muted: #8a8070;
+  --line: #e4d9c0;
+  --gold: #c99a4b;
+  --dw: #b9824e;
+  --pr: #6b806c;
+  --fo: #7c8f63;
+  --we: #4c6977;
+  --li: #c9807a;
+  --da: #344d5a;
+  --cl: #62667a;
+  --danger: #a95543;
+  --radius-card: 20px;
+
+  margin: 0;
+  background: #ece4d1;
+  color: var(--ink);
+  font: 15px/1.6 "Noto Sans TC", system-ui, -apple-system, sans-serif;
+  min-height: 100dvh;
+}
+.dojo * {
+  box-sizing: border-box;
+}
+.dojo .app {
+  max-width: 500px;
+  margin: auto;
+  min-height: 100dvh;
+  background: var(--bg);
+  padding-bottom: 88px;
+  position: relative;
+}
+.dojo .top {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  background: #fdfaf3ec;
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+  padding: 14px 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.dojo .brand {
+  font: 700 20px "Noto Serif TC", serif;
+  letter-spacing: 0.14em;
+}
+.dojo .top button,
+.dojo button {
+  font: inherit;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  background: var(--paper);
+  border-radius: 11px;
+  min-height: 42px;
+  padding: 8px 11px;
+  cursor: pointer;
+}
+.dojo .screen {
+  padding: 18px 16px;
+}
+.dojo .screen h1 {
+  font: 600 24px "Noto Serif TC", serif;
+  margin: 0 0 4px;
+  letter-spacing: 0.02em;
+}
+.dojo .lead {
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.dojo .hero,
+.dojo .box,
+.dojo .item,
+.dojo .card {
+  width: 100%;
+  text-align: left;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  padding: 16px;
+  margin: 11px 0;
+  box-shadow: 0 1px 2px #7e654510;
+}
+.dojo .hero {
+  min-height: 170px;
+  background: linear-gradient(150deg, #fdfaf3, #efdfbd);
+  border-radius: 22px;
+}
+.dojo .hero h2 {
+  font: 600 26px "Noto Serif TC", serif;
+  margin: 9px 0;
+}
+.dojo .eyebrow,
+.dojo .label {
+  font-size: 12px;
+  color: var(--gold);
+  letter-spacing: 0.08em;
+}
+.dojo .grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 11px;
+}
+.dojo .space {
+  min-height: 100px;
+  text-align: left;
+  border-radius: 18px;
+}
+.dojo .space b,
+.dojo .item b,
+.dojo .card b {
+  display: block;
+}
+.dojo .space small,
+.dojo .item small,
+.dojo .card small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 4px;
+}
+.dojo .dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.dojo .dw .dot {
+  background: var(--dw);
+}
+.dojo .pr .dot {
+  background: var(--pr);
+}
+.dojo .fo .dot {
+  background: var(--fo);
+}
+.dojo .we .dot {
+  background: var(--we);
+}
+.dojo .li .dot {
+  background: var(--li);
+}
+.dojo .da .dot {
+  background: var(--da);
+}
+.dojo .cl .dot {
+  background: var(--cl);
+}
+.dojo .row {
+  display: flex;
+  gap: 8px;
+  overflow: auto;
+  padding: 3px 0 5px;
+  flex-wrap: wrap;
+}
+.dojo .row button {
+  white-space: nowrap;
+  min-height: 36px;
+  font-size: 13px;
+}
+.dojo .row button.on {
+  background: #eee1c8;
+  border-color: var(--gold);
+}
+.dojo .two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.dojo .primary {
+  width: 100%;
+  background: #4d6557;
+  color: #fffaf0;
+  border-color: #4d6557;
+}
+.dojo .secondary {
+  background: #f3e8d6;
+}
+.dojo .danger {
+  color: var(--danger);
+  border-color: #d9aaa0;
+}
+.dojo .note {
+  padding: 10px 12px;
+  background: #f3e8d6;
+  border-radius: 12px;
+  color: var(--muted);
+  font-size: 12px;
+  margin: 12px 0;
+}
+.dojo .tag,
+.dojo .status {
+  display: inline-block;
+  font-size: 11px;
+  padding: 3px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  margin: 5px 4px 0 0;
+}
+.dojo .status {
+  background: #eee1c8;
+}
+.dojo .progress {
+  height: 7px;
+  background: #eee4d3;
+  border-radius: 999px;
+  overflow: hidden;
+  margin: 10px 0;
+}
+.dojo .progress i {
+  display: block;
+  height: 100%;
+  background: var(--gold);
+  border-radius: 999px;
+}
+.dojo .check {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 0;
+  border-bottom: 1px solid #eadbc4;
+  font-size: 13px;
+}
+.dojo .check:last-child {
+  border: 0;
+}
+.dojo .check input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--we);
+}
+.dojo .timeline {
+  position: relative;
+  padding-left: 20px;
+}
+.dojo .timeline:before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 5px;
+  bottom: 8px;
+  border-left: 1px solid var(--line);
+}
+.dojo .event {
+  position: relative;
+  padding: 0 0 16px 10px;
+  font-size: 13px;
+}
+.dojo .event:before {
+  content: "";
+  position: absolute;
+  left: -19px;
+  top: 5px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--event, var(--gold));
+  border: 2px solid var(--bg);
+}
+.dojo .event small {
+  display: block;
+  color: var(--muted);
+}
+.dojo .nav {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 8;
+  width: min(100%, 500px);
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  background: #fdfaf3f4;
+  border-top: 1px solid var(--line);
+  padding: 10px 6px calc(10px + env(safe-area-inset-bottom));
+  border-radius: 20px 20px 0 0;
+}
+.dojo .nav button {
+  border: 0;
+  background: transparent;
+  padding: 4px 2px;
+  font-size: 11px;
+  color: var(--muted);
+  min-height: 50px;
+  border-radius: 14px;
+}
+.dojo .nav button span {
+  display: block;
+  font-size: 19px;
+  margin-bottom: 2px;
+}
+.dojo .nav button.on {
+  color: var(--ink);
+  font-weight: 700;
+  background: #eee1c8;
+}
+.dojo .modal {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: #30251f66;
+  display: flex;
+  align-items: flex-end;
+}
+.dojo .sheet {
+  width: min(500px, 100%);
+  background: var(--bg);
+  border-radius: 22px 22px 0 0;
+  padding: 18px;
+  max-height: 88vh;
+  overflow: auto;
+}
+.dojo .sheet h2 {
+  font: 600 23px "Noto Serif TC", serif;
+  margin: 10px 0;
+}
+.dojo .field {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 11px;
+  background: var(--paper);
+  margin: 5px 0 12px;
+  font: inherit;
+}
+.dojo .toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0;
+}
+.dojo .toolbar input {
+  flex: 1;
+}
+.dojo .empty {
+  text-align: center;
+  padding: 22px 14px;
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.dojo .actions {
+  display: flex;
+  gap: 7px;
+  margin-top: 10px;
+}
+.dojo .actions button {
+  min-height: 34px;
+  padding: 5px 8px;
+  font-size: 12px;
+}
+.dojo .hidden {
+  display: none;
+}
+@media (min-width: 501px) {
+  .dojo {
+    padding: 20px;
+  }
+  .dojo .app {
+    box-shadow: 0 6px 28px #7e654522;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dojo * {
+    scroll-behavior: auto !important;
+  }
+}

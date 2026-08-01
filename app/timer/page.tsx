@@ -1,0 +1,153 @@
+"use client";
+
+// 修行計時(雛形 timer()/toggleTimer()/finishTimer()等的等價實作)。
+// 修掉雛形本身的 bug:finishTimer() 原本無論選了 25/45/60/90 分,計算已投入分鐘數時
+// 一律寫死用 25*60 起算,導致選 45/60/90 分時記錄的分鐘數是錯的。這裡改成用實際選定
+// 的起始秒數(initialSeconds)計算。
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useDojo } from "@/lib/dojo/store";
+import { SPACES, LIGHT_NEN, type SpaceKey, type NenKey } from "@/lib/dojo/constants";
+import { formatTimer } from "@/lib/dojo/format";
+
+const MINUTE_OPTIONS = [25, 45, 60, 90];
+const TIMER_SPACE_KEYS = (Object.keys(SPACES) as SpaceKey[]).filter((k) => k !== "closing" && k !== "dao");
+
+export default function TimerPage() {
+  const router = useRouter();
+  const { timerConfig, addEntry } = useDojo();
+
+  const [selectedMinutes, setSelectedMinutes] = useState(25);
+  const [initialSeconds, setInitialSeconds] = useState(25 * 60);
+  const [remainingSeconds, setRemainingSeconds] = useState(25 * 60);
+  const [running, setRunning] = useState(false);
+  const [space, setSpace] = useState<SpaceKey>(timerConfig.space);
+  const [title, setTitle] = useState(timerConfig.title);
+  const [kind, setKind] = useState(timerConfig.kind);
+  const [nen, setNen] = useState<NenKey | null>(timerConfig.nen);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, []);
+
+  function setMinutes(m: number) {
+    setSelectedMinutes(m);
+    setInitialSeconds(m * 60);
+    setRemainingSeconds(m * 60);
+  }
+
+  function toggleTimer() {
+    setRunning((prev) => {
+      const next = !prev;
+      if (next) {
+        intervalRef.current = setInterval(() => {
+          setRemainingSeconds((s) => {
+            if (s <= 0) {
+              if (intervalRef.current) clearInterval(intervalRef.current);
+              return 0;
+            }
+            return s - 1;
+          });
+        }, 1000);
+      } else if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+      return next;
+    });
+  }
+
+  function finishTimer() {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    setRunning(false);
+    // 修正:用實際選定的起始秒數計算,不是寫死 25*60。
+    const spent = Math.max(1, Math.round((initialSeconds - remainingSeconds) / 60));
+    addEntry({
+      title,
+      space,
+      kind,
+      note: `修行計時 ${spent} 分鐘`,
+      privacy: "私人",
+      nen,
+    });
+    setRemainingSeconds(initialSeconds);
+    router.push("/practice");
+    alert(`已記下 ${spent} 分鐘的修行時間。`);
+  }
+
+  return (
+    <section className="screen">
+      <h1>修行計時</h1>
+      <p className="lead">
+        任何有意識投入的時間都可以是修行:身、心、靈修、野採、織光、聊解都能記錄。不是只有靈修。
+      </p>
+      <div className="card" style={{ textAlign: "center", padding: 24 }}>
+        <span className="label">目前計時</span>
+        <div style={{ font: "600 54px/1.15 ui-monospace,monospace", margin: "12px 0" }}>
+          {formatTimer(remainingSeconds)}
+        </div>
+        <small>{running ? "計時中" : remainingSeconds === initialSeconds ? "尚未開始" : "已暫停"}</small>
+        <div className="two" style={{ marginTop: 16 }}>
+          <button className="primary" onClick={toggleTimer}>
+            {running ? "暫停" : "開始"}
+          </button>
+          <button onClick={finishTimer}>結束並記錄</button>
+        </div>
+      </div>
+
+      <div className="row">
+        {MINUTE_OPTIONS.map((m) => (
+          <button key={m} className={selectedMinutes === m ? "on" : ""} onClick={() => setMinutes(m)}>
+            {m} 分
+          </button>
+        ))}
+      </div>
+
+      <div className="card">
+        <label>這段時間屬於哪個場域?</label>
+        <div className="row">
+          {TIMER_SPACE_KEYS.map((k) => (
+            <button key={k} className={space === k ? "on" : ""} onClick={() => setSpace(k)}>
+              {SPACES[k][0]}
+            </button>
+          ))}
+        </div>
+        <small style={{ display: "block", margin: "-4px 0 12px", color: "var(--muted)" }}>
+          已自動帶入你剛剛所在的場域,仍可手動切換。
+        </small>
+
+        <label>你在練什麼?</label>
+        <input
+          className="field"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="例如:知的覺察、創作草稿、服務準備"
+        />
+
+        <label>光念(選填)</label>
+        <div className="row">
+          {(Object.entries(LIGHT_NEN) as [NenKey, (typeof LIGHT_NEN)[NenKey]][]).map(([k, v]) => (
+            <button key={k} className={nen === k ? "on" : ""} onClick={() => setNen(k)}>
+              {v[0]}
+            </button>
+          ))}
+        </div>
+
+        <label>類型／能力</label>
+        <input
+          className="field"
+          value={kind}
+          onChange={(e) => setKind(e.target.value)}
+          placeholder="例如:心／知、念能／專注、草稿"
+        />
+        <small>開始前可改;計時結束時會建立一筆有分鐘數的修行紀錄。</small>
+      </div>
+
+      <div className="note">
+        正式版要支援暫停、背景計時、通知、手動補登、計時與 Session 關聯,以及不必完成一個番茄鐘也能保存已投入時間。
+      </div>
+    </section>
+  );
+}
