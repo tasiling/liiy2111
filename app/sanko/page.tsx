@@ -11,7 +11,9 @@
 // 3. 八方法規格集中在 lib/dojo/methods.ts,維持寫死(總綱凍結清單)。
 //
 // 新增(原型沒有):待產出清單入口、貼回生成結果存草稿、完成回寫 DB-04。
-// 這三步的資料模型判斷與已知落差,見 docs/schema/日上三更指令產生器.md。
+// 草稿與產出連結(2026-08-01 擁有者於 Notion 新增對應欄位後)一律直接寫 Notion,
+// 不經瀏覽器暫存——App 掛掉時擁有者必須能在 Notion 直接看到草稿並手動接手。
+// 詳見 docs/schema/日上三更指令產生器.md。
 import { useEffect, useState } from "react";
 import { SANKO_METHOD_LIST, type SankoMethodKey } from "@/lib/dojo/methods";
 
@@ -22,6 +24,8 @@ type PendingDetail = {
   抽出順序: string;
   所屬Session: string | null;
   明細狀態: string | null;
+  草稿: string;
+  產出連結: string | null;
 };
 
 type SankoDraft = {
@@ -46,34 +50,6 @@ const EMPTY_DRAFT: SankoDraft = {
   outputLink: "",
 };
 
-function draftKey(detailId: string) {
-  return `sanko-draft-${detailId}`;
-}
-
-// 用 localStorage 保存進行中的草稿(而非純 React state):實際使用情境是使用者會
-// 短暫離開 App 去外部 AI 生成,手機瀏覽器背景分頁有被系統回收的風險,存在
-// localStorage 才能保證回來後進度還在。
-function loadDraft(detailId: string): SankoDraft {
-  if (typeof window === "undefined") return EMPTY_DRAFT;
-  const raw = window.localStorage.getItem(draftKey(detailId));
-  if (!raw) return EMPTY_DRAFT;
-  try {
-    return { ...EMPTY_DRAFT, ...JSON.parse(raw) };
-  } catch {
-    return EMPTY_DRAFT;
-  }
-}
-
-function saveDraft(detailId: string, draft: SankoDraft) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(draftKey(detailId), JSON.stringify(draft));
-}
-
-function clearDraft(detailId: string) {
-  if (typeof window === "undefined") return;
-  window.localStorage.removeItem(draftKey(detailId));
-}
-
 export default function SankoPage() {
   const [pending, setPending] = useState<PendingDetail[]>([]);
   const [loadingPending, setLoadingPending] = useState(false);
@@ -87,6 +63,7 @@ export default function SankoPage() {
   const [composeMissing, setComposeMissing] = useState<string[] | null>(null);
   const [copied, setCopied] = useState(false);
 
+  const [savingDraft, setSavingDraft] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [finishMsg, setFinishMsg] = useState<string | null>(null);
   const [finishError, setFinishError] = useState<string | null>(null);
@@ -112,38 +89,32 @@ export default function SankoPage() {
     load();
   }, []);
 
-  // 選定一筆待產出明細:先看有沒有存過的草稿(離開又回來),沒有才用該筆的
-  // 抽出順序自動帶入牌卡資料。
+  // 選定一筆明細:草稿與產出連結直接來自 Notion(pending 清單 API 已回傳),
+  // 不再從 localStorage 讀取。方法/牌卡/光站/補充是每次生成指令用的暫時輸入,
+  // 不需要跨造訪保存,所以有抽出順序就重新帶入牌卡文字即可。
   async function selectDetail(item: PendingDetail) {
     setSelected(item);
     setComposeMissing(null);
     setCopied(false);
     setFinishMsg(null);
     setFinishError(null);
-    const saved = loadDraft(item.id);
-    if (saved.methodKey || saved.cards || saved.prompt) {
-      setDraft(saved);
-      return;
-    }
-    const next = { ...EMPTY_DRAFT };
+    const next: SankoDraft = {
+      ...EMPTY_DRAFT,
+      draftText: item.草稿 ?? "",
+      outputLink: item.產出連結 ?? "",
+    };
     setDraft(next);
     if (item.抽出順序) {
       const r = await fetch(`/api/sanko/cards?detailId=${item.id}`);
       const d = await r.json();
       if (d.cards) {
-        const withCards = { ...next, cards: d.cards };
-        setDraft(withCards);
-        saveDraft(item.id, withCards);
+        setDraft((prev) => ({ ...prev, cards: d.cards }));
       }
     }
   }
 
   function updateDraft(patch: Partial<SankoDraft>) {
-    setDraft((prev) => {
-      const next = { ...prev, ...patch };
-      if (selected) saveDraft(selected.id, next);
-      return next;
-    });
+    setDraft((prev) => ({ ...prev, ...patch }));
   }
 
   async function build() {
@@ -182,29 +153,54 @@ export default function SankoPage() {
     setTimeout(() => setCopied(false), 2400);
   }
 
+  // 存草稿:寫入 DB-04「草稿」欄位。若明細仍是待產出,伺服器端會自動推進到待審核
+  // (不得跳過此關卡)。
+  async function saveDraftText() {
+    if (!selected) return;
+    if (!draft.draftText.trim()) {
+      setFinishError("請先貼上生成結果,再存草稿。");
+      return;
+    }
+    setSavingDraft(true);
+    setFinishError(null);
+    setFinishMsg(null);
+    try {
+      const res = await fetch(`/api/details/${selected.id}/draft`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ draftText: draft.draftText }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "草稿儲存失敗");
+      setFinishMsg("草稿已存入 Notion。");
+      refreshPending();
+    } catch (e) {
+      setFinishError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSavingDraft(false);
+    }
+  }
+
+  // 標記完成:寫入 DB-04 明細層級「產出連結」(必填,批次多篇時每篇各自一則貼文,
+  // Session 表頭單一欄位裝不下)。伺服器端會擋待產出直接標記完成(須先存草稿進入
+  // 待審核),待審核則推進為已產出。
   async function finish() {
     if (!selected) return;
+    if (!draft.outputLink.trim()) {
+      setFinishError("產出連結為必填,請先填入再標記完成。");
+      return;
+    }
     setFinishing(true);
     setFinishError(null);
     setFinishMsg(null);
     try {
-      const statusRes = await fetch(`/api/details/${selected.id}/status`, {
+      const res = await fetch(`/api/details/${selected.id}/output-link`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ newStatus: "已產出" }),
+        body: JSON.stringify({ url: draft.outputLink.trim() }),
       });
-      const statusData = await statusRes.json();
-      if (!statusRes.ok) throw new Error(statusData.error ?? "狀態更新失敗");
-
-      if (draft.outputLink.trim() && selected.所屬Session) {
-        await fetch(`/api/sessions/${selected.所屬Session}/output-link`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url: draft.outputLink.trim() }),
-        });
-      }
-
-      clearDraft(selected.id);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "標記完成失敗");
       setFinishMsg(`${selected.明細編號} 已標記完成。`);
       setSelected(null);
       setDraft(EMPTY_DRAFT);
@@ -217,6 +213,7 @@ export default function SankoPage() {
   }
 
   const methodInfo = draft.methodKey ? SANKO_METHOD_LIST.find((m) => m.key === draft.methodKey) : null;
+  const showDraftBack = Boolean(draft.prompt || draft.draftText);
 
   return (
     <section className="screen sanko">
@@ -227,9 +224,9 @@ export default function SankoPage() {
 
         <div className="step">
           <h2>待產出清單</h2>
-          <div className="hint">明細狀態=待產出,依對應日期排序;點一筆進入下面的流程。</div>
+          <div className="hint">明細狀態=待產出或待審核,依對應日期排序;待審核代表已存過草稿,點進去可以接續完成。</div>
           {loadingPending && <p className="meta">載入中…</p>}
-          {!loadingPending && pending.length === 0 && <p className="meta">目前沒有待產出的明細。</p>}
+          {!loadingPending && pending.length === 0 && <p className="meta">目前沒有待處理的明細。</p>}
           <div className="row">
             {pending.map((item) => (
               <button
@@ -238,7 +235,7 @@ export default function SankoPage() {
                 onClick={() => selectDetail(item)}
               >
                 {item.明細編號}
-                <small>{item.對應日期 ?? "無日期"}</small>
+                <small>{item.對應日期 ?? "無日期"} · {item.明細狀態 ?? "待產出"}</small>
               </button>
             ))}
           </div>
@@ -354,22 +351,26 @@ export default function SankoPage() {
               </div>
             )}
 
-            {draft.prompt && (
+            {showDraftBack && (
               <div className="step">
                 <h2>五 · 貼回生成結果</h2>
-                <div className="hint">從外部 AI 拿到內容後貼回這裡,先存著,確認沒問題再標記完成。</div>
+                <div className="hint">從外部 AI 拿到內容後貼回這裡並按「存草稿」——草稿直接存進 Notion,不是暫存在這個瀏覽器裡。</div>
                 <textarea
                   className="field"
                   value={draft.draftText}
                   onChange={(e) => updateDraft({ draftText: e.target.value })}
                   placeholder="貼上 AI 生成的主文+解析包"
                 />
-                <label>產出連結(選填)</label>
+                <button className="ghost" disabled={savingDraft} onClick={saveDraftText}>
+                  {savingDraft ? "存檔中…" : "存草稿"}
+                </button>
+
+                <label>產出連結(必填)</label>
                 <input
                   className="field"
                   value={draft.outputLink}
                   onChange={(e) => updateDraft({ outputLink: e.target.value })}
-                  placeholder="發布後的連結,可留空之後再補"
+                  placeholder="發布後的連結(標記完成前必須先填)"
                 />
                 <button className="primary" disabled={finishing} onClick={finish}>
                   {finishing ? "送出中…" : "標記完成"}

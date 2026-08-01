@@ -73,9 +73,10 @@ export const EVENT_STATUS = ["啟用", "停用"] as const;
 // DB-15 場次表狀態
 export const SESSION_SLOT_STATUS = ["預定", "已完成"] as const;
 
-// DB-04 抽牌明細「明細狀態」(委派書 v1.6 新增):單筆明細的生產進度,順序固定,終點=已交付。
+// DB-04 抽牌明細「明細狀態」(委派書 v1.6 新增,2026-08-01 擁有者於 Notion 新增
+// 「待審核」選項擴充為四階):單筆明細的生產進度,順序固定,終點=已交付。
 // 表頭 DB-03「狀態」不受影響——批次 Session 的實際進度改由此欄匯總顯示,表頭仍是 Session 整體生命週期。
-export const DETAIL_STATUS_ORDER = ["待產出", "已產出", "已交付"] as const;
+export const DETAIL_STATUS_ORDER = ["待產出", "待審核", "已產出", "已交付"] as const;
 export type DetailStatus = (typeof DETAIL_STATUS_ORDER)[number];
 export const DETAIL_STATUS_DEFAULT: DetailStatus = "待產出";
 

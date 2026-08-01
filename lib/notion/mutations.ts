@@ -205,6 +205,30 @@ export async function updateSessionOutputLink(sessionId: string, url: string) {
   );
 }
 
+// 日上三更・指令產生器(2026-08-01,DB-04 新增「草稿」「產出連結」欄位)。
+// 草稿一律存 Notion,不存瀏覽器暫存——App 掛掉時擁有者必須能在 Notion 直接看到
+// 草稿並手動接手,這是不可協商的邊界。
+export async function updateDetailDraft(detailId: string, draftText: string) {
+  await withNotionRateLimit(() =>
+    notion().pages.update({
+      page_id: detailId,
+      properties: { 草稿: richTextProp(draftText) },
+    })
+  );
+}
+
+// 明細層級的產出連結(與 DB-03 Session 表頭的產出連結是不同欄位):批次一次多篇時
+// 每篇各自一則貼文,Session 表頭單一欄位裝不下,改用這裡。允許清空(傳空字串)。
+export async function updateDetailOutputLink(detailId: string, url: string) {
+  const trimmed = url.trim();
+  await withNotionRateLimit(() =>
+    notion().pages.update({
+      page_id: detailId,
+      properties: { 產出連結: trimmed ? urlProp(trimmed) : { url: null } },
+    })
+  );
+}
+
 export async function findSessionCodeById(sessionId: string): Promise<string> {
   const page = await withNotionRateLimit(() => notion().pages.retrieve({ page_id: sessionId }));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
