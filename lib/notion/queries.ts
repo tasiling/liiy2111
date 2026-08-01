@@ -140,6 +140,19 @@ export async function listDetailsInRange(startISO: string, endISO: string) {
   return pages.map(mapDetail);
 }
 
+// 日上三更指令產生器:進入頁面先列出全部待產出明細(依對應日期排序)。
+// 空值一律視同「待產出」(既有的防禦性 fallback 規則),用 or 條件把「明細狀態=待產出」
+// 與「明細狀態未填」都納入,避免舊資料或任何管道漏寫的空值明細變成黑數,清單看不到。
+export async function listPendingDetails() {
+  const pages = await queryAll(DATA_SOURCES.DB04_抽牌明細, {
+    or: [
+      { property: "明細狀態", select: { equals: "待產出" } },
+      { property: "明細狀態", select: { is_empty: true } },
+    ],
+  });
+  return pages.map(mapDetail).sort((a, b) => (a.對應日期 ?? "").localeCompare(b.對應日期 ?? ""));
+}
+
 // --- DB-06 固定項目註冊表 ---
 export function mapEvent(p: NotionPage) {
   return {

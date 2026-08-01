@@ -173,6 +173,15 @@
   background: #eee1c8;
   border-color: var(--gold);
 }
+.dojo .row button small {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 400;
+}
+.dojo .row button.on small {
+  color: var(--ink);
+}
 .dojo .two {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -366,6 +375,87 @@
 .dojo .hidden {
   display: none;
 }
+
+/* 日上三更・指令產生器雛形移植(擁有者提供的第二份 HTML 原型,2026-08-01)。
+   這份原型是獨立的一頁小工具,跟第一份雛形共用同一套配色變數,但另外定義了
+   一組自己的元件類別(.step/.hint/.out/.meta/.warn/.stationgrid/.quad/.ghost)。
+   逐條搬移,不重新設計。.tag 的樣式兩份原型不同(這份用金色外框),用 .sanko
+   範圍限定改寫,避免影響第一份雛形已經在用的 .tag(居所光念計數、道藏光念標記等,
+   維持原本樣式不變)。 */
+.dojo .step {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 15px;
+  margin-bottom: 12px;
+}
+.dojo .step h2 {
+  font: 600 16px "Noto Serif TC", serif;
+  margin: 0 0 3px;
+}
+.dojo .hint {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin-bottom: 11px;
+}
+.dojo .out {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px;
+  font: 13px/1.7 ui-monospace, "Noto Sans TC", monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 340px;
+  overflow: auto;
+  margin-top: 10px;
+}
+.dojo .meta {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 8px;
+}
+.dojo .warn {
+  background: #f7e6e0;
+  border-left: 3px solid var(--danger);
+  padding: 9px 11px;
+  border-radius: 0 9px 9px 0;
+  font-size: 12.5px;
+  margin-top: 10px;
+}
+.dojo .ghost {
+  background: transparent;
+  border-style: dashed;
+  color: var(--muted);
+}
+.dojo .stationgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px;
+  margin-top: 6px;
+}
+.dojo .stationgrid button {
+  text-align: left;
+  font-size: 12.5px;
+  min-height: 36px;
+  padding: 6px 9px;
+}
+.dojo .quad {
+  font-size: 11.5px;
+  color: var(--gold);
+  letter-spacing: 0.06em;
+  margin: 9px 0 3px;
+}
+.dojo .sanko .tag {
+  border-color: var(--gold);
+  color: var(--gold);
+  margin: 0 4px 4px 0;
+}
+.dojo .sanko .tag.sub {
+  border-color: var(--line);
+  color: var(--muted);
+}
+
 @media (min-width: 501px) {
   .dojo {
     padding: 20px;
