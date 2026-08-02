@@ -59,16 +59,17 @@ export const XCG_FLOORS = buildXcgFloors();
 export const FATE_FLOORS = buildFateFloors();
 
 export type PlurkTemplateSeed = {
-  id: string;
   method: string;
   name: string;
   main: string;
   floors: string[];
 };
 
+// 這兩個預設範本不再自動存在(範本現在存 Notion,不應該在使用者沒有動作的情況下
+// 自動寫入資料);「範本」子頁在清單為空時提供「建立預設範本」按鈕,使用者按下去
+// 才會真的建立這兩筆,是明確的使用者動作,不是背景靜默寫入。
 export const DEFAULT_TEMPLATES: PlurkTemplateSeed[] = [
   {
-    id: "tpl-xcg",
     method: "xincheng",
     name: "心乘光・週指引",
     main:
@@ -78,7 +79,6 @@ export const DEFAULT_TEMPLATES: PlurkTemplateSeed[] = [
     floors: XCG_FLOORS,
   },
   {
-    id: "tpl-fate",
     method: "qianshi",
     name: "聊解時間・命運籤詩",
     main:

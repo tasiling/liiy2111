@@ -5,11 +5,10 @@
 // 亮金邊、範本建立與編輯、由版型產生骨架皆照原型,不重新設計。視覺沿用行光道場
 // .dojo CSS token(見 app/dojo.css 的 .plurk 區塊)。
 //
-// 儲存:目前用瀏覽器 localStorage(lib/plurk/store.ts)暫存,是等擁有者決定「範本」
-// 存放處(委派書明確要求先回報建議方案)與「草稿」在 DB-04 的可行寫法(所屬 Session
-// 必填、無排程時間欄、狀態語意不同)之前的暫時做法,不是最終形態。決定後只需要
-// 替換 lib/plurk/store.ts,這個檔案的其餘邏輯不受影響。詳見
-// docs/schema/噗浪蓋樓台.md。
+// 儲存(2026-08-02 擁有者裁決):範本與草稿都存 DB-14 知識庫,不新增欄位,標題
+// 前綴區分類型,排程時間/樓層/發布狀態序列化存進「內容」欄(lib/plurk/notionFormat.ts)。
+// 文字類編輯(主噗/樓層內容)採 1.2 秒防抖自動存檔,結構性動作(新增/刪除/標記
+// 完成/排程時間)即時送出,不需要使用者手動按「存檔」。
 //
 // 不接噗浪 API、不做自動發佈——排程只是「預先寫好＋到點提示」。
 import { useEffect, useMemo, useRef, useState, Fragment, type ReactNode } from "react";
@@ -17,10 +16,10 @@ import {
   SANKO_TEMPLATES,
   SANKO_SECT_ORDER,
   SANKO_SECT_HINT,
+  DEFAULT_TEMPLATES,
   type SankoTemplateSpec,
 } from "@/lib/plurk/data";
 import {
-  uid,
   fill,
   fmtAt,
   isDue,
@@ -33,7 +32,6 @@ import {
   type PlurkDraftStatus,
   type PlurkTemplate,
 } from "@/lib/plurk/logic";
-import { loadPlurkState, savePlurkState, type PlurkState } from "@/lib/plurk/store";
 
 type TabKey = "post" | "sanko" | "tpl";
 type DraftMode = "copy" | "edit";
@@ -75,8 +73,32 @@ function renderPv(text: string): ReactNode {
   ));
 }
 
+async function postJSON(url: string, body: unknown) {
+  const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "請求失敗");
+  return data;
+}
+async function patchJSON(url: string, body: unknown) {
+  const res = await fetch(url, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "請求失敗");
+  return data;
+}
+async function del(url: string) {
+  const res = await fetch(url, { method: "DELETE" });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error ?? "刪除失敗");
+  }
+}
+
 export default function PlurkPage() {
-  const [state, setState] = useState<PlurkState>({ templates: [], drafts: [] });
+  const [templates, setTemplates] = useState<PlurkTemplate[]>([]);
+  const [drafts, setDrafts] = useState<PlurkDraft[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const [tab, setTab] = useState<TabKey>("post");
   const [openId, setOpenId] = useState<string | null>(null);
   const [mode, setMode] = useState<DraftMode>("copy");
@@ -88,10 +110,23 @@ export default function PlurkPage() {
   const [now, setNow] = useState<Date>(() => new Date());
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const draftSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const tplSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   useEffect(() => {
-    function load() {
-      setState(loadPlurkState());
+    async function load() {
+      try {
+        const [tRes, dRes] = await Promise.all([fetch("/api/plurk/templates"), fetch("/api/plurk/drafts")]);
+        const tData = await tRes.json();
+        const dData = await dRes.json();
+        if (!tRes.ok || !dRes.ok) throw new Error(tData.error ?? dData.error ?? "載入失敗");
+        setTemplates(tData.templates ?? []);
+        setDrafts(dData.drafts ?? []);
+      } catch (e) {
+        setLoadError(e instanceof Error ? e.message : String(e));
+      } finally {
+        setLoading(false);
+      }
     }
     load();
   }, []);
@@ -108,69 +143,115 @@ export default function PlurkPage() {
     toastTimer.current = setTimeout(() => setToastMsg(null), 1900);
   }
 
-  function mutate(fn: (prev: PlurkState) => PlurkState) {
-    setState((prev) => {
-      const next = fn(prev);
-      savePlurkState(next);
-      return next;
-    });
+  function persistDraft(d: PlurkDraft) {
+    clearTimeout(draftSaveTimers.current[d.id]);
+    draftSaveTimers.current[d.id] = setTimeout(() => {
+      patchJSON(`/api/plurk/drafts/${d.id}`, {
+        method: d.method,
+        tplName: d.tplName,
+        main: d.main,
+        floors: d.floors,
+        at: d.at,
+        status: d.status,
+        createdAt: d.createdAt,
+      }).catch(() => toast("草稿自動存檔失敗,請檢查網路"));
+    }, 1200);
   }
 
-  function newFromTpl(id: string) {
-    const t = state.templates.find((x) => x.id === id);
+  function persistTemplate(t: PlurkTemplate) {
+    clearTimeout(tplSaveTimers.current[t.id]);
+    tplSaveTimers.current[t.id] = setTimeout(() => {
+      patchJSON(`/api/plurk/templates/${t.id}`, { name: t.name, method: t.method, main: t.main, floors: t.floors }).catch(() =>
+        toast("範本自動存檔失敗,請檢查網路")
+      );
+    }, 1200);
+  }
+
+  async function newFromTpl(id: string) {
+    const t = templates.find((x) => x.id === id);
     if (!t) return;
-    const d: PlurkDraft = {
-      id: uid(),
+    const payload = {
       method: t.method,
       tplName: t.name,
       main: fill(t.main),
       floors: t.floors.map(fill),
       at: "",
-      status: "draft",
+      status: "draft" as PlurkDraftStatus,
     };
-    mutate((prev) => ({ ...prev, drafts: [d, ...prev.drafts] }));
-    setOpenId(d.id);
-    setMode("edit");
-    setCopied({});
-    setTab("post");
-    toast("已用範本建立草稿");
+    try {
+      const data = await postJSON("/api/plurk/drafts", payload);
+      const d: PlurkDraft = { id: data.id, createdAt: data.createdAt, ...payload };
+      setDrafts((prev) => [d, ...prev]);
+      setOpenId(d.id);
+      setMode("edit");
+      setCopied({});
+      setTab("post");
+      toast("已用範本建立草稿");
+    } catch {
+      toast("建立草稿失敗,請檢查網路");
+    }
   }
 
-  function newBlank() {
-    const d: PlurkDraft = { id: uid(), method: "", tplName: "", main: "", floors: [], at: "", status: "draft" };
-    mutate((prev) => ({ ...prev, drafts: [d, ...prev.drafts] }));
-    setOpenId(d.id);
-    setMode("edit");
-    setCopied({});
+  async function newBlank() {
+    const payload = { method: "", tplName: "", main: "", floors: [] as string[], at: "", status: "draft" as PlurkDraftStatus };
+    try {
+      const data = await postJSON("/api/plurk/drafts", payload);
+      const d: PlurkDraft = { id: data.id, createdAt: data.createdAt, ...payload };
+      setDrafts((prev) => [d, ...prev]);
+      setOpenId(d.id);
+      setMode("edit");
+      setCopied({});
+    } catch {
+      toast("建立草稿失敗,請檢查網路");
+    }
   }
 
-  function buildSanko(key: string, density: 1 | 3) {
+  async function buildSanko(key: string, density: 1 | 3) {
     const m = SANKO_TEMPLATES.find((x) => x.key === key);
     if (!m) return;
     const s = scaffold(m, density);
-    const t: PlurkTemplate = { id: uid(), method: m.key, name: m.name + "・噗浪版", main: fill(s.main), floors: s.floors };
-    mutate((prev) => ({ ...prev, templates: [t, ...prev.templates] }));
-    setTab("tpl");
-    toast(`已建立「${t.name}」骨架,調好表符與字句就是你的範本`);
+    const payload = { name: m.name + "・噗浪版", method: m.key, main: fill(s.main), floors: s.floors };
+    try {
+      const data = await postJSON("/api/plurk/templates", payload);
+      const t: PlurkTemplate = { id: data.id, method: payload.method, name: payload.name, main: payload.main, floors: payload.floors };
+      setTemplates((prev) => [t, ...prev]);
+      setTab("tpl");
+      toast(`已建立「${t.name}」骨架,調好表符與字句就是你的範本`);
+    } catch {
+      toast("建立骨架失敗,請檢查網路");
+    }
   }
 
-  function doSplit() {
+  async function createDefaultTemplates() {
+    try {
+      for (const seed of DEFAULT_TEMPLATES) {
+        const data = await postJSON("/api/plurk/templates", { name: seed.name, method: seed.method, main: seed.main, floors: seed.floors });
+        const t: PlurkTemplate = { id: data.id, method: seed.method, name: seed.name, main: seed.main, floors: seed.floors };
+        setTemplates((prev) => [t, ...prev]);
+      }
+      toast("已建立 2 個預設範本");
+    } catch {
+      toast("建立失敗,請檢查網路");
+    }
+  }
+
+  async function doSplit() {
     if (!splitTplId) {
       toast("先選擇要套的範本");
       return;
     }
-    const tpl = state.templates.find((t) => t.id === splitTplId);
+    const tpl = templates.find((t) => t.id === splitTplId);
     if (!tpl) return;
     const hasC = /[①-⑳]/.test(splitText);
-    if (splitTplId === "tpl-xcg" && hasC) {
+    if (tpl.method === "xincheng" && hasC) {
       toast("內文有①②圈號,看起來是命運籤詩格式");
       return;
     }
-    if (splitTplId === "tpl-fate" && !hasC) {
+    if (tpl.method === "qianshi" && !hasC) {
       toast("沒找到①②圈號,對不上命運籤詩的分樓規則");
       return;
     }
-    const parser = PARSERS[splitTplId] ?? splitGeneric;
+    const parser = PARSERS[tpl.method] ?? splitGeneric;
     const r = parser(splitText);
     if (!r.floors.length) {
       toast(`長文對不上「${tpl.name}」的分樓規則`);
@@ -178,42 +259,35 @@ export default function PlurkPage() {
     }
     let main = fill(tpl.main);
     if (r.intro) {
-      if (splitTplId === "tpl-fate") {
+      if (tpl.method === "qianshi") {
         const b = r.intro
           .split("\n")
           .filter((l) => !/命運籤詩/.test(l))
           .join("\n")
           .trim();
-        if (b) {
-          main =
-            "**【聊解時間 ※ 命運籤詩】**\n" + b;
-        }
-      } else if (splitTplId === "tpl-xcg") {
+        if (b) main = "**【聊解時間 ※ 命運籤詩】**\n" + b;
+      } else if (tpl.method === "xincheng") {
         const b2 = r.intro
           .split("\n")
           .filter((l) => !/心乘光.{0,6}指引/.test(l))
           .join("\n")
           .trim();
-        if (b2) {
-          main = fill("**【心乘光•指引:{{起}}～{{迄}}】**") + "\n(此處上傳本週牌卡圖)\n" + b2;
-        }
+        if (b2) main = fill("**【心乘光•指引:{{起}}～{{迄}}】**") + "\n(此處上傳本週牌卡圖)\n" + b2;
       }
     }
-    const d: PlurkDraft = {
-      id: uid(),
-      method: tpl.method,
-      tplName: tpl.name,
-      main,
-      floors: r.floors,
-      at: "",
-      status: "draft",
-    };
-    mutate((prev) => ({ ...prev, drafts: [d, ...prev.drafts] }));
-    setSplitOpen(false);
-    setOpenId(d.id);
-    setMode("edit");
-    setCopied({});
-    toast(`已分成 ${r.floors.length} 樓`);
+    const payload = { method: tpl.method, tplName: tpl.name, main, floors: r.floors, at: "", status: "draft" as PlurkDraftStatus };
+    try {
+      const data = await postJSON("/api/plurk/drafts", payload);
+      const d: PlurkDraft = { id: data.id, createdAt: data.createdAt, ...payload };
+      setDrafts((prev) => [d, ...prev]);
+      setSplitOpen(false);
+      setOpenId(d.id);
+      setMode("edit");
+      setCopied({});
+      toast(`已分成 ${r.floors.length} 樓`);
+    } catch {
+      toast("建立草稿失敗,請檢查網路");
+    }
   }
 
   function openCard(id: string, m: DraftMode) {
@@ -226,50 +300,61 @@ export default function PlurkPage() {
   }
 
   function setDraftField<K extends keyof PlurkDraft>(id: string, key: K, value: PlurkDraft[K]) {
-    mutate((prev) => ({
-      ...prev,
-      drafts: prev.drafts.map((d) => {
-        if (d.id !== id) return d;
-        const next = { ...d, [key]: value };
-        if (key === "at") next.status = value ? "scheduled" : "draft";
-        return next;
-      }),
-    }));
+    const current = drafts.find((d) => d.id === id);
+    if (!current) return;
+    const next: PlurkDraft = { ...current, [key]: value };
+    if (key === "at") next.status = (value as string) ? "scheduled" : "draft";
+    setDrafts((prev) => prev.map((d) => (d.id === id ? next : d)));
+    persistDraft(next);
   }
 
-  function delDraft(id: string) {
+  async function delDraft(id: string) {
     if (!window.confirm("刪除這篇草稿?")) return;
-    mutate((prev) => ({ ...prev, drafts: prev.drafts.filter((d) => d.id !== id) }));
-    if (openId === id) setOpenId(null);
+    try {
+      await del(`/api/plurk/drafts/${id}`);
+      setDrafts((prev) => prev.filter((d) => d.id !== id));
+      if (openId === id) setOpenId(null);
+    } catch {
+      toast("刪除失敗,請檢查網路");
+    }
   }
 
   function addFloor(id: string) {
-    mutate((prev) => ({
-      ...prev,
-      drafts: prev.drafts.map((d) => (d.id === id ? { ...d, floors: [...d.floors, ""] } : d)),
-    }));
+    const current = drafts.find((d) => d.id === id);
+    if (!current) return;
+    const next = { ...current, floors: [...current.floors, ""] };
+    setDrafts((prev) => prev.map((d) => (d.id === id ? next : d)));
+    persistDraft(next);
   }
   function delFloor(id: string, i: number) {
-    mutate((prev) => ({
-      ...prev,
-      drafts: prev.drafts.map((d) => (d.id === id ? { ...d, floors: d.floors.filter((_, x) => x !== i) } : d)),
-    }));
+    const current = drafts.find((d) => d.id === id);
+    if (!current) return;
+    const next = { ...current, floors: current.floors.filter((_, x) => x !== i) };
+    setDrafts((prev) => prev.map((d) => (d.id === id ? next : d)));
+    persistDraft(next);
   }
   function editFloor(id: string, i: number, v: string) {
-    mutate((prev) => ({
-      ...prev,
-      drafts: prev.drafts.map((d) => (d.id === id ? { ...d, floors: d.floors.map((f, x) => (x === i ? v : f)) } : d)),
-    }));
+    const current = drafts.find((d) => d.id === id);
+    if (!current) return;
+    const next = { ...current, floors: current.floors.map((f, x) => (x === i ? v : f)) };
+    setDrafts((prev) => prev.map((d) => (d.id === id ? next : d)));
+    persistDraft(next);
   }
 
-  function saveAsTpl(id: string) {
-    const d = state.drafts.find((x) => x.id === id);
+  async function saveAsTpl(id: string) {
+    const d = drafts.find((x) => x.id === id);
     if (!d) return;
     const n = window.prompt("範本名稱:", d.tplName || deriveTitle(d));
     if (!n) return;
-    const t: PlurkTemplate = { id: uid(), method: d.method, name: n, main: d.main, floors: [...d.floors] };
-    mutate((prev) => ({ ...prev, templates: [t, ...prev.templates] }));
-    toast("已存成範本");
+    const payload = { name: n, method: d.method, main: d.main, floors: [...d.floors] };
+    try {
+      const data = await postJSON("/api/plurk/templates", payload);
+      const t: PlurkTemplate = { id: data.id, method: payload.method, name: payload.name, main: payload.main, floors: payload.floors };
+      setTemplates((prev) => [t, ...prev]);
+      toast("已存成範本");
+    } catch {
+      toast("存範本失敗,請檢查網路");
+    }
   }
 
   function markPosted(id: string, status: PlurkDraftStatus) {
@@ -278,7 +363,7 @@ export default function PlurkPage() {
   }
 
   async function doCopy(id: string, i: number) {
-    const d = state.drafts.find((x) => x.id === id);
+    const d = drafts.find((x) => x.id === id);
     if (!d) return;
     const txt = i === 0 ? d.main : d.floors[i - 1];
     let ok = false;
@@ -308,38 +393,48 @@ export default function PlurkPage() {
   }
 
   function tplPatchField<K extends keyof PlurkTemplate>(id: string, key: K, value: PlurkTemplate[K]) {
-    mutate((prev) => ({ ...prev, templates: prev.templates.map((t) => (t.id === id ? { ...t, [key]: value } : t)) }));
+    const current = templates.find((t) => t.id === id);
+    if (!current) return;
+    const next = { ...current, [key]: value };
+    setTemplates((prev) => prev.map((t) => (t.id === id ? next : t)));
+    persistTemplate(next);
   }
   function tplAddFloor(id: string) {
-    mutate((prev) => ({
-      ...prev,
-      templates: prev.templates.map((t) => (t.id === id ? { ...t, floors: [...t.floors, ""] } : t)),
-    }));
+    const current = templates.find((t) => t.id === id);
+    if (!current) return;
+    const next = { ...current, floors: [...current.floors, ""] };
+    setTemplates((prev) => prev.map((t) => (t.id === id ? next : t)));
+    persistTemplate(next);
   }
   function tplDelFloor(id: string, i: number) {
-    mutate((prev) => ({
-      ...prev,
-      templates: prev.templates.map((t) => (t.id === id ? { ...t, floors: t.floors.filter((_, x) => x !== i) } : t)),
-    }));
+    const current = templates.find((t) => t.id === id);
+    if (!current) return;
+    const next = { ...current, floors: current.floors.filter((_, x) => x !== i) };
+    setTemplates((prev) => prev.map((t) => (t.id === id ? next : t)));
+    persistTemplate(next);
   }
   function tplEditFloor(id: string, i: number, v: string) {
-    mutate((prev) => ({
-      ...prev,
-      templates: prev.templates.map((t) =>
-        t.id === id ? { ...t, floors: t.floors.map((f, x) => (x === i ? v : f)) } : t
-      ),
-    }));
+    const current = templates.find((t) => t.id === id);
+    if (!current) return;
+    const next = { ...current, floors: current.floors.map((f, x) => (x === i ? v : f)) };
+    setTemplates((prev) => prev.map((t) => (t.id === id ? next : t)));
+    persistTemplate(next);
   }
-  function delTpl(id: string) {
-    if (state.templates.length <= 1) {
+  async function delTpl(id: string) {
+    if (templates.length <= 1) {
       toast("至少留一個範本");
       return;
     }
     if (!window.confirm("刪除這個範本?")) return;
-    mutate((prev) => ({ ...prev, templates: prev.templates.filter((t) => t.id !== id) }));
+    try {
+      await del(`/api/plurk/templates/${id}`);
+      setTemplates((prev) => prev.filter((t) => t.id !== id));
+    } catch {
+      toast("刪除失敗,請檢查網路");
+    }
   }
 
-  const dueCount = useMemo(() => state.drafts.filter((d) => isDue(d, now)).length, [state.drafts, now]);
+  const dueCount = useMemo(() => drafts.filter((d) => isDue(d, now)).length, [drafts, now]);
 
   function ord(d: PlurkDraft) {
     if (isDue(d, now)) return 0;
@@ -348,14 +443,14 @@ export default function PlurkPage() {
     return 3;
   }
   const sortedDrafts = useMemo(() => {
-    return [...state.drafts].sort((a, b) => {
+    return [...drafts].sort((a, b) => {
       const x = ord(a) - ord(b);
       if (x) return x;
       if (a.at && b.at) return new Date(a.at).getTime() - new Date(b.at).getTime();
       return 0;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.drafts, now]);
+  }, [drafts, now]);
 
   function draftCard(d: PlurkDraft) {
     const due = isDue(d, now);
@@ -475,7 +570,7 @@ export default function PlurkPage() {
   }
 
   function sankoCard(m: SankoTemplateSpec) {
-    const done = state.templates.filter((t) => t.method === m.key);
+    const done = templates.filter((t) => t.method === m.key);
     return (
       <section key={m.key} className="card">
         <div className="chead st">
@@ -623,6 +718,24 @@ export default function PlurkPage() {
     );
   }
 
+  if (loading) {
+    return (
+      <section className="screen plurk">
+        <h1>噗浪・蓋樓台</h1>
+        <p className="lead">載入中…</p>
+      </section>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <section className="screen plurk">
+        <h1>噗浪・蓋樓台</h1>
+        <div className="warn">讀取失敗:{loadError}</div>
+      </section>
+    );
+  }
+
   return (
     <section className="screen plurk">
       <h1>噗浪・蓋樓台</h1>
@@ -649,9 +762,9 @@ export default function PlurkPage() {
             <button className="go" onClick={() => setSplitOpen((v) => !v)}>
               ✦ 長文分樓
             </button>
-            {state.templates[0] && (
-              <button className="gh" onClick={() => newFromTpl(state.templates[0].id)}>
-                套「{state.templates[0].name}」
+            {templates[0] && (
+              <button className="gh" onClick={() => newFromTpl(templates[0].id)}>
+                套「{templates[0].name}」
               </button>
             )}
             <button className="gh" onClick={newBlank}>
@@ -666,14 +779,14 @@ export default function PlurkPage() {
                   第一步:選要套的範本。第二步:貼整篇長文。對不上規則會直接告訴你,不會亂切。
                 </div>
                 <div className="pickrow">
-                  {state.templates.map((t) => (
+                  {templates.map((t) => (
                     <button
                       key={t.id}
                       className={"pick" + (splitTplId === t.id ? " on" : "")}
                       onClick={() => setSplitTplId(t.id)}
                     >
                       {t.name}
-                      {!PARSERS[t.id] && <small>需用 --- 斷樓</small>}
+                      {!PARSERS[t.method] && <small>需用 --- 斷樓</small>}
                     </button>
                   ))}
                 </div>
@@ -691,7 +804,7 @@ export default function PlurkPage() {
             </section>
           )}
 
-          {state.drafts.length === 0 ? (
+          {drafts.length === 0 ? (
             <div className="empty">還沒有草稿。用範本開第一篇,標題日期會自動帶入下週。</div>
           ) : (
             sortedDrafts.map((d) => draftCard(d))
@@ -721,8 +834,22 @@ export default function PlurkPage() {
 
       {tab === "tpl" && (
         <>
-          {state.templates.map((t) => tplCard(t))}
-          <p className="note">範本裡的 {"{{起}}"}／{"{{迄}}"} 會在建立草稿時自動換成下週一／下週日。表符就是把表符圖片網址直接放在文字裡。</p>
+          {templates.length === 0 && (
+            <div className="empty">
+              還沒有範本。可以到「日上三更」頁籤挑一張版型產生骨架,或先建立 2 個現成的預設範本。
+              <div className="acts" style={{ justifyContent: "center", marginTop: 10 }}>
+                <button className="go" onClick={createDefaultTemplates}>
+                  建立預設範本(心乘光・週指引 / 命運籤詩)
+                </button>
+              </div>
+            </div>
+          )}
+          {templates.map((t) => tplCard(t))}
+          {templates.length > 0 && (
+            <p className="note">
+              範本裡的 {"{{起}}"}／{"{{迄}}"} 會在建立草稿時自動換成下週一／下週日。表符就是把表符圖片網址直接放在文字裡。
+            </p>
+          )}
         </>
       )}
     </section>

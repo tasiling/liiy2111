@@ -12,6 +12,7 @@ export type PlurkDraft = {
   floors: string[];
   at: string; // datetime-local 字串,未排程為 ""
   status: PlurkDraftStatus;
+  createdAt: string; // 建立日期(YYYY-MM-DD),存 Notion 標題後綴用,建立後不變
 };
 
 export type PlurkTemplate = {
@@ -192,9 +193,12 @@ export function splitGeneric(raw: string): SplitResult {
   };
 }
 
+// 以範本的 method(方法代號)決定 parser,不是用範本 id——範本存進 Notion 後
+// id 是 Notion 動態指派的頁面 id,不是原型裡固定的 "tpl-xcg"/"tpl-fate",只有
+// method 是穩定不變的識別依據。
 export const PARSERS: Record<string, (raw: string) => SplitResult> = {
-  "tpl-xcg": splitXCG,
-  "tpl-fate": splitFate,
+  xincheng: splitXCG,
+  qianshi: splitFate,
 };
 
 // 由版型產生骨架:density=1 為每選項一樓,density=3 為每選項多樓(空/雨/傘分開)。
