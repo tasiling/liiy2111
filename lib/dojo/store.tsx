@@ -31,6 +31,7 @@ type DojoStore = {
   addEntry: (entry: NewEntry) => void;
   updateEntry: (id: number, entry: NewEntry) => void;
   removeEntry: (id: number) => void;
+  setEntryFreq: (id: number, freq: number | null) => void;
   modalOpen: boolean;
   modalOptions: QuickAddOptions;
   openQuickAdd: (opts?: QuickAddOptions) => void;
@@ -61,6 +62,13 @@ export function DojoProvider({ children }: { children: ReactNode }) {
 
   const removeEntry = useCallback((id: number) => {
     setEntries((prev) => prev.filter((e) => e.id !== id));
+  }, []);
+
+  // 測頻只在收光復盤階段設定(v1.3 §3.5.1),獨立成一個動作而不是借用
+  // updateEntry,避免呼叫端得為了改一個數值湊出整筆 NewEntry。freq=null 代表
+  // 清除標記,回到「尚未標記」狀態。
+  const setEntryFreq = useCallback((id: number, freq: number | null) => {
+    setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, freq: freq ?? undefined } : e)));
   }, []);
 
   const openQuickAdd = useCallback((opts: QuickAddOptions = {}) => {
@@ -94,6 +102,7 @@ export function DojoProvider({ children }: { children: ReactNode }) {
       addEntry,
       updateEntry,
       removeEntry,
+      setEntryFreq,
       modalOpen,
       modalOptions,
       openQuickAdd,
@@ -108,6 +117,7 @@ export function DojoProvider({ children }: { children: ReactNode }) {
       addEntry,
       updateEntry,
       removeEntry,
+      setEntryFreq,
       modalOpen,
       modalOptions,
       openQuickAdd,

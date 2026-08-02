@@ -245,6 +245,12 @@
 .dojo .check:last-child {
   border: 0;
 }
+/* 測頻滑桿(收光復盤,三方協作規格書 v1.3 §3.5.1):單筆數值輸入,不是進度條——
+   只是把 accent 色套上金線,沒有分母、沒有填滿比例的視覺語彙。 */
+.dojo input[type="range"] {
+  width: 100%;
+  accent-color: var(--gold);
+}
 .dojo .check input {
   width: 18px;
   height: 18px;

@@ -123,7 +123,9 @@ export default function HomePage() {
       <h3>接續中的事</h3>
       {recentEntries.length === 0 && <div className="empty">目前沒有可公開顯示的接續事項。</div>}
       {recentEntries.map((e) => (
-        <EntryCard key={e.id} entry={e} />
+        // 測頻不得在居所以任何形式顯示(v1.3 §2.3),明確關閉——不要靠 EntryCard
+        // 的預設值,避免日後預設值被改動而在居所悄悄露出。
+        <EntryCard key={e.id} entry={e} showFreq={false} />
       ))}
 
       <h3>六個場域</h3>
