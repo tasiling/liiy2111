@@ -35,6 +35,9 @@ export type DojoEntry = {
   note?: string;
   date: string;
   nen: NenKey | null;
+  // 測頻(三方協作規格書 v1.3 §2.3/§3.5.1):只在收光復盤階段填入,紀錄當下
+  // 一律留空。undefined = 尚未標記,不是 0 分——0 不是合法的測頻值。
+  freq?: number;
 };
 
 // 雛形內建的三筆示範資料,直接沿用。
