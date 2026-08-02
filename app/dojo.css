@@ -53,6 +53,21 @@
   font: 700 20px "Noto Serif TC", serif;
   letter-spacing: 0.14em;
 }
+/* 頂部返回鍵(新增返回導航):取代居所以外頁面左上角原本的品牌字,樸素文字
+   按鈕,不要跟一般操作按鈕一樣有邊框底色,才不會搶走真正的操作按鈕的份量。 */
+.dojo .backbtn {
+  background: transparent;
+  border: none;
+  padding: 4px 2px;
+  margin: 0;
+  font: 600 16px "Noto Serif TC", serif;
+  color: var(--ink);
+  min-height: 44px;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
 .dojo .top button,
 .dojo button {
   font: inherit;

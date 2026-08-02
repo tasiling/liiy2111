@@ -12,6 +12,7 @@
 //
 // 不接噗浪 API、不做自動發佈——排程只是「預先寫好＋到點提示」。
 import { useEffect, useMemo, useRef, useState, Fragment, type ReactNode } from "react";
+import { useBackableState } from "@/lib/dojo/backstack";
 import {
   SANKO_TEMPLATES,
   SANKO_SECT_ORDER,
@@ -112,6 +113,10 @@ export default function PlurkPage() {
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const draftSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const tplSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  // 打開一則草稿的詳情是頁面內的 drill-down,不是換頁(擁有者指示:返回手勢
+  // 要能一步步退回):打開時推一筆瀏覽器歷史,返回時自動收合回發文佇列清單。
+  useBackableState(openId != null, () => setOpenId(null));
 
   useEffect(() => {
     async function load() {

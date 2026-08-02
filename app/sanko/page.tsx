@@ -16,6 +16,7 @@
 // 詳見 docs/schema/日上三更指令產生器.md。
 import { useEffect, useState } from "react";
 import { SANKO_METHOD_LIST, type SankoMethodKey } from "@/lib/dojo/methods";
+import { useBackableState } from "@/lib/dojo/backstack";
 
 type PendingDetail = {
   id: string;
@@ -67,6 +68,11 @@ export default function SankoPage() {
   const [finishing, setFinishing] = useState(false);
   const [finishMsg, setFinishMsg] = useState<string | null>(null);
   const [finishError, setFinishError] = useState<string | null>(null);
+
+  // 點一筆進入詳情是頁面內的「drill-down」,不是換頁(擁有者指示:返回手勢
+  // 要能一步步退回,單筆詳情 → 來源清單):打開時推一筆瀏覽器歷史,返回時
+  // 自動收合回清單,不會直接跳出 /sanko。
+  useBackableState(selected != null, () => setSelected(null));
 
   async function refreshPending() {
     setLoadingPending(true);

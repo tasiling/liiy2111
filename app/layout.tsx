@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { DojoProvider } from "@/lib/dojo/store";
+import { BackStackProvider } from "@/lib/dojo/backstack";
 import DojoShell from "./components/DojoShell";
 import "./globals.css";
 import "./dojo.css";
@@ -32,7 +33,9 @@ export default function RootLayout({
     >
       <body className="min-h-full">
         <DojoProvider>
-          <DojoShell>{children}</DojoShell>
+          <BackStackProvider>
+            <DojoShell>{children}</DojoShell>
+          </BackStackProvider>
         </DojoProvider>
       </body>
     </html>
