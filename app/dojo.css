@@ -456,6 +456,350 @@
   color: var(--muted);
 }
 
+/* 噗浪・蓋樓台移植(擁有者提供的第三份 HTML 原型 plurk-tower.html,2026-08-02)。
+   這份原型也是自成一套的獨立小工具,元件類別與前兩份雛形都不同,逐條搬移、
+   全部用 .plurk 範圍限定,避免影響其他頁面(尤其 .card/.dot/.tag 等在別處已有
+   既定樣式的通用類別)。*/
+.dojo .plurk .card {
+  padding: 0;
+  overflow: hidden;
+}
+.dojo .plurk .tabs {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin: 14px 0 0;
+  border-bottom: 1px solid var(--line);
+}
+.dojo .plurk .tabs button {
+  all: unset;
+  box-sizing: border-box;
+  padding: 9px 14px;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+  min-height: 44px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.dojo .plurk .tabs button.on {
+  color: var(--ink);
+  border-bottom-color: var(--gold);
+  font-weight: 600;
+}
+.dojo .plurk .badge {
+  background: var(--gold);
+  color: #fffaf0;
+  border-radius: 10px;
+  font-size: 11px;
+  padding: 1px 7px;
+  margin-left: 5px;
+  font-weight: 700;
+}
+.dojo .plurk .acts {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+.dojo .plurk .go {
+  background: #4d6557;
+  border-color: #4d6557;
+  color: #fffaf0;
+  font-weight: 600;
+}
+.dojo .plurk .gh {
+  background: transparent;
+}
+.dojo .plurk .dg {
+  color: var(--danger);
+  border-color: #dcc0b8;
+  background: transparent;
+}
+.dojo .plurk .wide {
+  width: 100%;
+  background: #f3e8d6;
+  border-color: var(--gold);
+  color: #9a7138;
+  font-weight: 600;
+  margin-top: 8px;
+}
+.dojo .plurk .sm {
+  padding: 7px 14px;
+  min-height: 38px;
+  border-radius: 9px;
+  font-size: 13px;
+}
+.dojo .plurk .tn {
+  padding: 3px 10px;
+  min-height: 0;
+  font-size: 12px;
+  border-radius: 8px;
+  color: var(--muted);
+}
+.dojo .plurk a.tn {
+  display: inline-block;
+  text-decoration: none;
+  border: 1px solid var(--line);
+  background: var(--paper);
+}
+.dojo .plurk .card.due {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 1px var(--gold);
+}
+.dojo .plurk .card.posted {
+  opacity: 0.6;
+}
+.dojo .plurk .chead {
+  all: unset;
+  box-sizing: border-box;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 14px 16px;
+  text-align: left;
+  cursor: pointer;
+}
+.dojo .plurk .chead.st {
+  cursor: default;
+}
+.dojo .plurk .ctitle {
+  font: 600 16px "Noto Serif TC", serif;
+}
+.dojo .plurk .card.due .ctitle,
+.dojo .plurk .card.due .cmeta {
+  color: #9a7138;
+}
+.dojo .plurk .cmeta {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.dojo .plurk .cbody {
+  padding: 12px 16px 16px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dojo .plurk .cbody.solo {
+  border-top: none;
+}
+.dojo .plurk .seg {
+  display: flex;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  overflow: hidden;
+  align-self: flex-start;
+}
+.dojo .plurk .seg button {
+  all: unset;
+  box-sizing: border-box;
+  padding: 8px 14px;
+  color: var(--muted);
+  font-size: 13px;
+  min-height: 40px;
+  cursor: pointer;
+}
+.dojo .plurk .seg button.on {
+  background: #eee1c8;
+  color: var(--ink);
+  font-weight: 600;
+}
+.dojo .plurk .prog {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+.dojo .plurk .tower {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: relative;
+  padding-left: 18px;
+  margin: 0;
+}
+.dojo .plurk .tower:before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 8px;
+  bottom: 8px;
+  width: 1px;
+  background: linear-gradient(var(--gold), var(--line));
+}
+.dojo .plurk .tower li {
+  position: relative;
+}
+.dojo .plurk .tower li:before {
+  content: "";
+  position: absolute;
+  left: -17px;
+  top: 9px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--paper);
+  border: 1.5px solid var(--gold);
+}
+.dojo .plurk .tower li.done:before {
+  background: var(--gold);
+}
+.dojo .plurk .ftag {
+  font: 400 13px "Noto Serif TC", serif;
+  color: #7a6f96;
+  letter-spacing: 0.2em;
+  margin-bottom: 4px;
+}
+.dojo .plurk .tower li.done .ftag {
+  color: #9a7138;
+}
+.dojo .plurk .fbox {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 11px 13px;
+}
+.dojo .plurk .ffoot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+  gap: 8px;
+}
+.dojo .plurk .cnt {
+  color: var(--muted);
+  font-size: 12px;
+}
+.dojo .plurk .cnt.over {
+  color: var(--danger);
+}
+.dojo .plurk .pv {
+  word-break: break-word;
+  white-space: pre-wrap;
+  font-size: 14px;
+}
+.dojo .plurk .pv b {
+  color: #9a7138;
+}
+.dojo .plurk .emo {
+  display: inline-block;
+  color: #7a6f96;
+  background: rgba(122, 111, 150, 0.1);
+  border: 1px solid rgba(122, 111, 150, 0.3);
+  border-radius: 6px;
+  font-size: 11px;
+  padding: 0 5px;
+  margin-right: 2px;
+}
+.dojo .plurk .lab {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.dojo .plurk .fedit {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dojo .plurk .fehead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.dojo .plurk .pickrow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.dojo .plurk .pick {
+  border: 1px solid var(--line);
+  background: var(--paper);
+  border-radius: 11px;
+  padding: 9px 13px;
+  min-height: 44px;
+  text-align: left;
+}
+.dojo .plurk .pick small {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+}
+.dojo .plurk .pick.on {
+  background: #eee1c8;
+  border-color: var(--gold);
+  font-weight: 600;
+}
+.dojo .plurk .segline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  align-items: center;
+  font-size: 12.5px;
+  color: #66564a;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: 9px 11px;
+}
+.dojo .plurk .k {
+  font: 400 11px "Noto Serif TC", serif;
+  color: #9a7138;
+  border: 1px solid var(--gold);
+  border-radius: 999px;
+  padding: 1px 7px;
+  margin-left: 6px;
+}
+.dojo .plurk .segline .k:first-child {
+  margin-left: 0;
+}
+.dojo .plurk .okline {
+  font-size: 13px;
+  color: #4d6557;
+  font-weight: 600;
+}
+.dojo .plurk .okline.dim {
+  color: var(--muted);
+  font-weight: 400;
+}
+.dojo .plurk .sect {
+  font: 600 15px "Noto Serif TC", serif;
+  color: #9a7138;
+  letter-spacing: 0.1em;
+  margin: 14px 0 -2px;
+  padding-left: 2px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.dojo .plurk .sect small {
+  font: 400 12px "Noto Sans TC";
+  color: var(--muted);
+  letter-spacing: 0;
+}
+.dojo .plurk .sect:first-child {
+  margin-top: 2px;
+}
+.dojo .plurk input[type="datetime-local"] {
+  min-height: 44px;
+  color-scheme: light;
+}
+.dojo .plurk .toast {
+  position: fixed;
+  left: 50%;
+  bottom: 96px;
+  transform: translateX(-50%);
+  background: #4d6557;
+  color: #fffaf0;
+  font-weight: 600;
+  border-radius: 12px;
+  padding: 11px 18px;
+  box-shadow: 0 6px 24px rgba(47, 42, 34, 0.25);
+  z-index: 9;
+}
+
 @media (min-width: 501px) {
   .dojo {
     padding: 20px;

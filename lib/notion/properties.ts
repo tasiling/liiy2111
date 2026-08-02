@@ -46,8 +46,18 @@ export function titleProp(text: string) {
   return { title: [{ text: { content: text } }] };
 }
 
+// Notion 單一 rich_text 區塊的 text.content 上限是 2000 字元(API 硬限制),超過會被
+// 拒絕。長文字(如噗浪蓋樓多樓草稿,一批可能上萬字)需要切成多個區塊——讀取端
+// readRichText() 本來就是把多個區塊的 plain_text 串接讀回,這裡補上寫入端對稱的
+// 切塊,對既有呼叫端(內容遠短於 2000 字)是無感的相容變更。
+const RICH_TEXT_BLOCK_LIMIT = 2000;
+
 export function richTextProp(text: string) {
-  return { rich_text: [{ text: { content: text } }] };
+  const chunks: { text: { content: string } }[] = [];
+  for (let i = 0; i < text.length; i += RICH_TEXT_BLOCK_LIMIT) {
+    chunks.push({ text: { content: text.slice(i, i + RICH_TEXT_BLOCK_LIMIT) } });
+  }
+  return { rich_text: chunks.length ? chunks : [{ text: { content: "" } }] };
 }
 
 export function selectProp(name: string) {

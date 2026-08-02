@@ -229,6 +229,40 @@ export async function updateDetailOutputLink(detailId: string, url: string) {
   );
 }
 
+// DB-14 知識庫的通用建立/更新/歸檔(噗浪・蓋樓台的範本與草稿都存這裡,2026-08-02
+// 擁有者裁決,不新增欄位:來源=原創、狀態=存貨、核可狀態=免審皆既有選項)。
+export async function createKnowledgeEntry(params: { 標題: string; 內容: string }) {
+  const page = await withNotionRateLimit(() =>
+    notion().pages.create({
+      parent: { type: "data_source_id", data_source_id: DATA_SOURCES.DB14_知識庫 },
+      properties: {
+        標題: titleProp(params.標題),
+        內容: richTextProp(params.內容),
+        來源: selectProp("原創"),
+        狀態: selectProp("存貨"),
+        核可狀態: selectProp("免審"),
+      },
+    })
+  );
+  return { id: page.id };
+}
+
+export async function updateKnowledgeEntry(id: string, patch: { 標題?: string; 內容?: string }) {
+  await withNotionRateLimit(() =>
+    notion().pages.update({
+      page_id: id,
+      properties: {
+        ...(patch.標題 !== undefined ? { 標題: titleProp(patch.標題) } : {}),
+        ...(patch.內容 !== undefined ? { 內容: richTextProp(patch.內容) } : {}),
+      },
+    })
+  );
+}
+
+export async function archiveKnowledgeEntry(id: string) {
+  await withNotionRateLimit(() => notion().pages.update({ page_id: id, archived: true }));
+}
+
 export async function findSessionCodeById(sessionId: string): Promise<string> {
   const page = await withNotionRateLimit(() => notion().pages.retrieve({ page_id: sessionId }));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -1,5 +1,5 @@
 import { notion, withNotionRateLimit } from "./client";
-import { DATA_SOURCES } from "./schema";
+import { DATA_SOURCES, PLURK_TEMPLATE_TITLE_PREFIX, PLURK_DRAFT_TITLE_PREFIX } from "./schema";
 import {
   readTitle,
   readRichText,
@@ -383,6 +383,24 @@ export async function listApprovedKnowledgeEntries() {
 // (見 lib/match.ts),只列清單供參考,擁有者自行判斷排入。
 export async function listAllKnowledgeEntries() {
   const pages = await queryAll(DATA_SOURCES.DB14_知識庫);
+  return pages.map(mapKnowledge);
+}
+
+// 噗浪・蓋樓台(2026-08-02 擁有者裁決):範本/草稿都存 DB-14,用標題前綴區分,
+// 不新增欄位。見 lib/plurk/notionFormat.ts 的序列化格式。
+export async function listPlurkTemplates() {
+  const pages = await queryAll(DATA_SOURCES.DB14_知識庫, {
+    property: "標題",
+    title: { starts_with: PLURK_TEMPLATE_TITLE_PREFIX },
+  });
+  return pages.map(mapKnowledge);
+}
+
+export async function listPlurkDrafts() {
+  const pages = await queryAll(DATA_SOURCES.DB14_知識庫, {
+    property: "標題",
+    title: { starts_with: PLURK_DRAFT_TITLE_PREFIX },
+  });
   return pages.map(mapKnowledge);
 }
 
