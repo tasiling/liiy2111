@@ -9,11 +9,46 @@ import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useDojo } from "@/lib/dojo/store";
 import { SPACES, LIGHT_NEN, type SpaceKey, type NenKey, type Privacy } from "@/lib/dojo/constants";
+import { useBackStack, useBackableState } from "@/lib/dojo/backstack";
+import { PARENT_ROUTE, ROUTE_LABEL, USE_BROWSER_BACK, NO_BACK_BUTTON } from "@/lib/dojo/backroutes";
 
 // 雛形 currentSpace():目前所在頁面若是七場域之一就用該場域,否則預設「修習所」。
 function currentSpaceFromPath(pathname: string): SpaceKey {
   const key = pathname.replace(/^\//, "") as SpaceKey;
   return key in SPACES ? key : "practice";
+}
+
+// 頂部返回鍵(擁有者指示:除居所外的所有頁面左上角顯示返回鍵,回到「上一層」
+// 而不是首頁)。若目前有 detail/彈出層開著(depth() > 0),先關掉那一層,和
+// 返回手勢的行為保持一致——不然使用者在 detail 展開時按這顆按鈕,會跳過
+// 「先收合 detail」這一步直接離開整個頁面,體感上比手勢版本少一層。
+function BackButton({ pathname }: { pathname: string }) {
+  const router = useRouter();
+  const { depth } = useBackStack();
+
+  if (NO_BACK_BUTTON.has(pathname)) return null;
+
+  const useBrowserBack = USE_BROWSER_BACK.has(pathname);
+  const parent = PARENT_ROUTE[pathname] ?? "/";
+  const label = useBrowserBack ? "返回" : (ROUTE_LABEL[parent] ?? "居所");
+
+  function handleClick() {
+    if (depth() > 0) {
+      window.history.back();
+      return;
+    }
+    if (useBrowserBack) {
+      router.back();
+      return;
+    }
+    router.push(parent);
+  }
+
+  return (
+    <button className="backbtn" onClick={handleClick} aria-label={`返回${label}`}>
+      ‹ {label}
+    </button>
+  );
 }
 
 const NAV_ITEMS: { key: string; icon: string; label: string; href?: string }[] = [
@@ -32,6 +67,11 @@ export default function DojoShell({ children }: { children: React.ReactNode }) {
   const { entries, addEntry, updateEntry, modalOpen, modalOptions, openQuickAdd, closeQuickAdd, startTimerFromSpace } =
     useDojo();
 
+  // 快速新增/編輯是全站共用的 bottom sheet(擁有者指示「彈出層的返回」要能關掉
+  // 彈出層而不是離開頁面):打開就推一筆瀏覽器歷史,返回手勢或按鈕關閉時，
+  // 歷史記錄自動同步退回。
+  useBackableState(modalOpen, closeQuickAdd);
+
   function openTimerFromHere() {
     startTimerFromSpace(currentSpaceFromPath(pathname));
     router.push("/timer");
@@ -41,7 +81,7 @@ export default function DojoShell({ children }: { children: React.ReactNode }) {
     <div className="dojo">
       <main className="app">
         <header className="top">
-          <div className="brand">行光道場</div>
+          {pathname === "/" ? <div className="brand">行光道場</div> : <BackButton pathname={pathname} />}
           <div style={{ display: "flex", gap: 7 }}>
             <button onClick={openTimerFromHere}>◷ 計時</button>
             <button onClick={() => router.push("/map")}>⌘ 地圖</button>

@@ -11,6 +11,7 @@ import {
 } from "@/lib/notion/schema";
 import { addDays, toISODate } from "@/lib/date";
 import { pageLabel } from "@/lib/labels";
+import { useBackableState } from "@/lib/dojo/backstack";
 
 const STATUS_ORDER: readonly string[] = SESSION_STATUS_ORDER;
 const 項目用途_OPTIONS: readonly string[] = SESSION_項目用途;
@@ -52,6 +53,10 @@ function SessionsPageInner() {
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const searchParams = useSearchParams();
   const rowRefs = useRef<Map<string, HTMLLIElement>>(new Map());
+
+  // 展開單筆 Session 的明細是頁面內的 drill-down(單筆詳情 → 來源清單),不是
+  // 換頁:返回手勢要能收合回清單,不直接跳出 /sessions。
+  useBackableState(expandedId != null, () => setExpandedId(null));
 
   function refreshSessions() {
     return fetch("/api/sessions")
