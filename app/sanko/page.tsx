@@ -24,6 +24,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { SANKO_METHOD_LIST, type SankoMethodKey } from "@/lib/dojo/methods";
 import { useBackableState } from "@/lib/dojo/backstack";
+import { normalizeDetailStatus } from "@/lib/notion/schema";
 
 type SankoUpdateType = "晨光" | "日光" | "夜光";
 const UPDATE_TYPES: SankoUpdateType[] = ["晨光", "日光", "夜光"];
@@ -149,6 +150,9 @@ export default function SankoPage() {
   const [creatingBatch, setCreatingBatch] = useState(false);
   const [batchMsg, setBatchMsg] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
 
   // 點一筆進入詳情是頁面內的「drill-down」,不是換頁(擁有者指示:返回手勢
   // 要能一步步退回,單筆詳情 → 來源清單):打開時推一筆瀏覽器歷史,返回時
@@ -228,6 +232,55 @@ export default function SankoPage() {
       await refreshBatches();
     } finally {
       setTogglingId(null);
+    }
+  }
+
+  // 單筆刪除(擁有者 2026-08-03 追加指示):只有明細狀態=待產出可以刪除,
+  // 「⋯」展開後才出現「刪除」,按下去還要再過一次 window.confirm 二次確認,
+  // 三步才會真的刪掉,避免手滑誤刪「無法復原」的動作。
+  async function deleteDetail(detail: PendingDetail) {
+    if (!window.confirm("將刪除 1 筆,此動作無法復原。確定要刪除嗎?")) return;
+    setDeletingId(detail.id);
+    try {
+      const res = await fetch(`/api/sanko/batches/${detail.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) {
+        setBatchMsg(`錯誤:${data.error ?? "刪除失敗"}`);
+        return;
+      }
+      setOpenMenuId(null);
+      await refreshBatches();
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  // 整批刪除:只刪這個 Session 底下明細狀態=待產出的部分,已產出/已交付一律
+  // 跳過——確認訊息先用前端已知的資料算出「會刪幾筆、跳過幾筆」,實際刪除
+  // 結果以伺服器回應為準(避免前端快取過期造成誤導)。
+  async function deleteBatch(batch: BatchGroup) {
+    const allDetails = batch.days.flatMap((day) => UPDATE_TYPES.map((u) => day.slots[u]).filter((d): d is PendingDetail => d != null));
+    const deletableCount = allDetails.filter((d) => normalizeDetailStatus(d.明細狀態) === "待產出").length;
+    const skippedCount = allDetails.length - deletableCount;
+    if (deletableCount === 0) {
+      setBatchMsg("這一批沒有待產出的明細可以刪除(已產出/已交付一律不能從 App 刪除)。");
+      return;
+    }
+    const skipNote = skippedCount > 0 ? `,${skippedCount} 筆已產出/已交付會跳過` : "";
+    if (!window.confirm(`將刪除 ${deletableCount} 筆${skipNote},此動作無法復原。確定要刪除嗎?`)) return;
+    setDeletingSessionId(batch.sessionId);
+    try {
+      const res = await fetch(`/api/sanko/batches?sessionId=${batch.sessionId}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) {
+        setBatchMsg(`錯誤:${data.error ?? "刪除失敗"}`);
+        return;
+      }
+      const skippedMsg = data.skipped?.length ? `,跳過 ${data.skipped.length} 筆已產出/已交付` : "";
+      setBatchMsg(`已刪除 ${data.deletedCount} 筆${skippedMsg}。`);
+      await refreshBatches();
+    } finally {
+      setDeletingSessionId(null);
     }
   }
 
@@ -414,24 +467,43 @@ export default function SankoPage() {
         )}
 
         {batchGroups.map((batch) => {
-          const isDone = (d: PendingDetail | null) => Boolean(d && (d.明細狀態 === "已產出" || d.明細狀態 === "已交付"));
+          const isDone = (d: PendingDetail | null) => Boolean(d && normalizeDetailStatus(d.明細狀態) === "已產出");
+          const isDelivered = (d: PendingDetail | null) => Boolean(d && normalizeDetailStatus(d.明細狀態) === "已交付");
+          const isFinished = (d: PendingDetail | null) => isDone(d) || isDelivered(d);
           const totalDone = batch.days.reduce(
-            (sum, day) => sum + UPDATE_TYPES.filter((u) => isDone(day.slots[u])).length,
+            (sum, day) => sum + UPDATE_TYPES.filter((u) => isFinished(day.slots[u])).length,
             0
           );
           const total = batch.days.length * 3;
+          const batchDeleting = deletingSessionId === batch.sessionId;
           return (
             <div key={batch.sessionId}>
               <div className="step" style={{ padding: "13px 15px" }}>
-                <h2>
-                  {fmtMD(batch.start)} – {fmtMD(batch.end)}
-                </h2>
-                <div className="hint" style={{ margin: 0 }}>
-                  已完成 {totalDone} / {total} 篇
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                  <div>
+                    <h2>
+                      {fmtMD(batch.start)} – {fmtMD(batch.end)}
+                    </h2>
+                    <div className="hint" style={{ margin: 0 }}>
+                      已完成 {totalDone} / {total} 篇
+                    </div>
+                  </div>
+                  <button
+                    className="act"
+                    disabled={batchDeleting}
+                    onClick={() => setOpenMenuId(openMenuId === batch.sessionId ? null : batch.sessionId)}
+                  >
+                    ⋯
+                  </button>
                 </div>
+                {openMenuId === batch.sessionId && (
+                  <button className="act" style={{ marginTop: 8, color: "var(--danger)" }} disabled={batchDeleting} onClick={() => deleteBatch(batch)}>
+                    {batchDeleting ? "刪除中…" : "刪除整批"}
+                  </button>
+                )}
               </div>
               {batch.days.map((day) => {
-                const doneN = UPDATE_TYPES.filter((u) => isDone(day.slots[u])).length;
+                const doneN = UPDATE_TYPES.filter((u) => isFinished(day.slots[u])).length;
                 const isToday = day.date === todayISO();
                 return (
                   <div key={day.date} className={"daycard" + (isToday ? " today" : "")}>
@@ -448,17 +520,21 @@ export default function SankoPage() {
                     {UPDATE_TYPES.map((u) => {
                       const detail = day.slots[u];
                       const info = UPDATE_INFO[u];
-                      const done = isDone(detail);
+                      const finished = isFinished(detail);
+                      const detailStatus = detail ? normalizeDetailStatus(detail.明細狀態) : null;
                       const status = !detail
                         ? "未建立"
-                        : done
+                        : finished
                           ? "已完成"
-                          : detail.明細狀態 === "待審核"
+                          : detailStatus === "待審核"
                             ? "待審核"
                             : "待產出";
                       const toggling = Boolean(detail && togglingId === detail.id);
+                      const deletable = Boolean(detail && detailStatus === "待產出");
+                      const menuOpen = Boolean(detail && openMenuId === detail.id);
+                      const rowDeleting = Boolean(detail && deletingId === detail.id);
                       return (
-                        <div key={u} className={"slot" + (done ? " done" : "")}>
+                        <div key={u} className={"slot" + (finished ? " done" : "")}>
                           <span className="bar" style={{ background: info.colorVar }} />
                           <div className="info">
                             <div className="name">{u}</div>
@@ -468,29 +544,52 @@ export default function SankoPage() {
                           </div>
                           {!detail ? (
                             <span className="meta">—</span>
-                          ) : info.mode === "生成" ? (
-                            done ? (
-                              <button className="act" disabled={toggling} onClick={() => quickToggle(detail, false)}>
-                                改回未完成
-                              </button>
-                            ) : (
-                              <>
-                                <button className="act primary" onClick={() => selectDetail(detail)}>
-                                  {status === "待審核" ? "繼續" : "產出"}
-                                </button>
-                                <button className="act check" disabled={toggling} onClick={() => quickToggle(detail, true)}>
-                                  ✓
-                                </button>
-                              </>
-                            )
                           ) : (
-                            <button
-                              className={"act check" + (done ? " on" : "")}
-                              disabled={toggling}
-                              onClick={() => quickToggle(detail, !done)}
-                            >
-                              ✓
-                            </button>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 7, justifyContent: "flex-end" }}>
+                              {info.mode === "生成" ? (
+                                finished ? (
+                                  <button className="act" disabled={toggling} onClick={() => quickToggle(detail, false)}>
+                                    改回未完成
+                                  </button>
+                                ) : (
+                                  <>
+                                    <button className="act primary" onClick={() => selectDetail(detail)}>
+                                      {status === "待審核" ? "繼續" : "產出"}
+                                    </button>
+                                    <button
+                                      className="act check"
+                                      disabled={toggling}
+                                      aria-label="標記完成"
+                                      onClick={() => quickToggle(detail, true)}
+                                    />
+                                  </>
+                                )
+                              ) : (
+                                <button
+                                  className={"act check" + (finished ? " on" : "")}
+                                  disabled={toggling}
+                                  aria-label={finished ? "取消勾選" : "標記完成"}
+                                  onClick={() => quickToggle(detail, !finished)}
+                                >
+                                  {finished && "✓"}
+                                </button>
+                              )}
+                              {deletable && (
+                                <button className="act" onClick={() => setOpenMenuId(menuOpen ? null : detail.id)}>
+                                  ⋯
+                                </button>
+                              )}
+                              {menuOpen && (
+                                <button
+                                  className="act"
+                                  style={{ color: "var(--danger)" }}
+                                  disabled={rowDeleting}
+                                  onClick={() => deleteDetail(detail)}
+                                >
+                                  {rowDeleting ? "刪除中…" : "刪除"}
+                                </button>
+                              )}
+                            </div>
                           )}
                         </div>
                       );

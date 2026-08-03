@@ -204,6 +204,17 @@ export async function setDetailQuickDone(detailId: string, done: boolean) {
   await updateDetailStatus(detailId, done ? "已產出" : "待產出");
 }
 
+// 日上三更・批次刪除(擁有者 2026-08-03 追加指示):只能刪除明細狀態=待產出的
+// 明細——待審核已經有草稿投入、已產出/已交付是紀錄層歷史,只增不改,一律不
+// 開放從 App 刪除,真要刪請在 Notion 手動處理。呼叫端(API route)需自行先
+// 驗證狀態再呼叫,這裡保持純寫入的職責,不重複檢查。
+// 用 archived:true(Notion 的軟刪除,移到該資料庫的垃圾桶,擁有者仍可在
+// Notion 端復原)而不是真的刪除頁面——比照 lib/plurk 既有的 archiveKnowledgeEntry
+// 慣例,對「無法復原」的 UI 警示留一層真實的安全網。
+export async function archiveDetail(detailId: string) {
+  await withNotionRateLimit(() => notion().pages.update({ page_id: detailId, archived: true }));
+}
+
 // 明細日期編輯/批次平移(擁有者 2026-07-13 追加指示):只允許明細狀態=待產出者變動
 // 日期——已產出/已交付是歷史紀錄,只增不改,呼叫端在此之前須先驗證狀態。
 export async function updateDetailDate(detailId: string, newDateISO: string) {

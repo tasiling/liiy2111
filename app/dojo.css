@@ -604,16 +604,28 @@
   border-color: var(--green, #4d6557);
   font-weight: 600;
 }
+/* 勾選框(擁有者 2026-08-03 修正指示):未完成=空框只有 1px 淺色線,框內不放
+   任何符號;已完成=墨綠實底＋白色 ✓。44×44 固定尺寸,用 flex 置中 ✓,不用
+   line-height 對齊(line-height 在不同字型/瀏覽器的實際置中位置會飄)。 */
 .dojo .sanko .act.check {
-  width: 40px;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
   padding: 0;
-  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 1;
+  border: 1px solid var(--line);
+  background: var(--paper);
   color: var(--muted);
 }
 .dojo .sanko .act.check.on {
-  background: var(--green, #4d6557);
-  color: #fffaf0;
-  border-color: var(--green, #4d6557);
+  background: #4d6557;
+  border-color: #4d6557;
+  color: #fff;
+  font-weight: 700;
 }
 
 /* 噗浪・蓋樓台移植(擁有者提供的第三份 HTML 原型 plurk-tower.html,2026-08-02)。
