@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { findCardByIdentifier } from "@/lib/notion/queries";
 import { writeDraw } from "@/lib/notion/mutations";
 
+// Notion 是唯一真相來源,寫入/刪除可能發生在 App 之外(擁有者直接在 Notion
+// 操作),讀取一律即時查詢,不吃 Next.js 的 Route Handler 快取,避免顯示已經
+// 在 Notion 端變動過的舊資料。
+export const dynamic = "force-dynamic";
 // P5 抽牌輸入:選牌組 + 輸入牌號序列 → 組出識別碼(MP-15 格式)並驗證存在於 DB-02。
 export async function POST(req: NextRequest) {
   const body = await req.json();

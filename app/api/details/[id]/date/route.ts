@@ -3,6 +3,10 @@ import { getDetail } from "@/lib/notion/queries";
 import { updateDetailDate, appendSessionNote } from "@/lib/notion/mutations";
 import { normalizeDetailStatus } from "@/lib/notion/schema";
 
+// Notion 是唯一真相來源,寫入/刪除可能發生在 App 之外(擁有者直接在 Notion
+// 操作),讀取一律即時查詢,不吃 Next.js 的 Route Handler 快取,避免顯示已經
+// 在 Notion 端變動過的舊資料。
+export const dynamic = "force-dynamic";
 // P5 單筆明細日期編輯(擁有者追加指示):同批次平移的限制——只允許明細狀態=待產出者
 // 變動日期,已產出/已交付是歷史紀錄,只增不改。異動同樣留軌跡於所屬 Session 表頭備註。
 export async function PATCH(req: NextRequest, ctx: RouteContext<"/api/details/[id]/date">) {

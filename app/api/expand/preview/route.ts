@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getEvent, listNodesForEvent, listSlotsForEvent } from "@/lib/notion/queries";
 import { expandSequence, isWithinRollingWindow, type SequenceNode } from "@/lib/date";
 
+// Notion 是唯一真相來源,寫入/刪除可能發生在 App 之外(擁有者直接在 Notion
+// 操作),讀取一律即時查詢,不吃 Next.js 的 Route Handler 快取,避免顯示已經
+// 在 Notion 端變動過的舊資料。
+export const dynamic = "force-dynamic";
 // P2 序列展開引擎(預覽):讀 DB-06/07/15,依錨點計算實際日期,不寫入 Notion。
 export async function POST(req: NextRequest) {
   const body = await req.json();

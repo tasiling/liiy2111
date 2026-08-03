@@ -7,6 +7,10 @@ import {
 } from "@/lib/notion/queries";
 import { matchServiceAtoms, matchKnowledgeEntries, type AtomMatch, type KnowledgeMatch } from "@/lib/match";
 
+// Notion 是唯一真相來源,寫入/刪除可能發生在 App 之外(擁有者直接在 Notion
+// 操作),讀取一律即時查詢,不吃 Next.js 的 Route Handler 快取,避免顯示已經
+// 在 Notion 端變動過的舊資料。
+export const dynamic = "force-dynamic";
 // P3 生產日工作台第 2/3 步支援:依月主題包「能量關鍵字」比對 DB-11 服務原子庫、
 // DB-14 知識庫。只列清單附命中標籤,不加推薦分數、不自動組合(擁有者 2026-07-12 定案)。
 export async function GET(req: NextRequest) {

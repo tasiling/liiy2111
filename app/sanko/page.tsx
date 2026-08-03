@@ -21,7 +21,7 @@
 // 產生指令→複製→貼回→標記完成),沿用既有邏輯,只是入口從清單換成日期卡。
 // 拍照辨牌(委派書 §4.2 引用的舊規格)確認不接——實際上線的生成流程本來就
 // 沒有這步,擁有者已確認不要臨時加。
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { SANKO_METHOD_LIST, type SankoMethodKey } from "@/lib/dojo/methods";
 import { useBackableState } from "@/lib/dojo/backstack";
 import { normalizeDetailStatus } from "@/lib/notion/schema";
@@ -153,6 +153,26 @@ export default function SankoPage() {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
+
+  // 長按整列顯示刪除(擁有者 2026-08-03 修正指示:移除常駐的「⋯」,改長按/右滑
+  // 才出現)。用 ref 而非 state 記時器與「剛長按過」旗標,避免每次計時都觸發
+  // 重繪;長按觸發後 pointerup 隨後而來的 click 事件要被吃掉,不然放開手指
+  // 會被判定成又點了一下整列(誤觸發產出流程或勾選切換)。
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressFired = useRef(false);
+  function startLongPress(id: string) {
+    longPressFired.current = false;
+    longPressTimer.current = setTimeout(() => {
+      longPressFired.current = true;
+      setOpenMenuId(id);
+    }, 500);
+  }
+  function cancelLongPress() {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }
 
   // 點一筆進入詳情是頁面內的「drill-down」,不是換頁(擁有者指示:返回手勢
   // 要能一步步退回,單筆詳情 → 來源清單):打開時推一筆瀏覽器歷史,返回時
@@ -533,52 +553,72 @@ export default function SankoPage() {
                       const deletable = Boolean(detail && detailStatus === "待產出");
                       const menuOpen = Boolean(detail && openMenuId === detail.id);
                       const rowDeleting = Boolean(detail && deletingId === detail.id);
+
+                      function activateRow() {
+                        if (!detail) return;
+                        if (info.mode === "生成") selectDetail(detail);
+                        else quickToggle(detail, !finished);
+                      }
+                      function onRowClick() {
+                        if (!detail) return;
+                        if (longPressFired.current) {
+                          longPressFired.current = false;
+                          return;
+                        }
+                        if (menuOpen) {
+                          setOpenMenuId(null);
+                          return;
+                        }
+                        activateRow();
+                      }
+
                       return (
                         <div key={u} className={"slot" + (finished ? " done" : "")}>
-                          <span className="bar" style={{ background: info.colorVar }} />
-                          <div className="info">
-                            <div className="name">{u}</div>
-                            <div className="meta">
-                              {info.desc} · {status}
-                            </div>
-                          </div>
                           {!detail ? (
-                            <span className="meta">—</span>
+                            <>
+                              <span className="bar" style={{ background: info.colorVar }} />
+                              <div className="info">
+                                <div className="name">{u}</div>
+                                <div className="meta">
+                                  {info.desc} · {status}
+                                </div>
+                              </div>
+                              <span className="meta">—</span>
+                            </>
                           ) : (
-                            <div style={{ display: "flex", flexWrap: "wrap", gap: 7, justifyContent: "flex-end" }}>
-                              {info.mode === "生成" ? (
-                                finished ? (
-                                  <button className="act" disabled={toggling} onClick={() => quickToggle(detail, false)}>
-                                    改回未完成
-                                  </button>
-                                ) : (
-                                  <>
-                                    <button className="act primary" onClick={() => selectDetail(detail)}>
-                                      {status === "待審核" ? "繼續" : "產出"}
-                                    </button>
-                                    <button
-                                      className="act check"
-                                      disabled={toggling}
-                                      aria-label="標記完成"
-                                      onClick={() => quickToggle(detail, true)}
-                                    />
-                                  </>
-                                )
-                              ) : (
-                                <button
-                                  className={"act check" + (finished ? " on" : "")}
-                                  disabled={toggling}
-                                  aria-label={finished ? "取消勾選" : "標記完成"}
-                                  onClick={() => quickToggle(detail, !finished)}
-                                >
-                                  {finished && "✓"}
-                                </button>
-                              )}
-                              {deletable && (
-                                <button className="act" onClick={() => setOpenMenuId(menuOpen ? null : detail.id)}>
-                                  ⋯
-                                </button>
-                              )}
+                            <>
+                              <div
+                                className="slotmain"
+                                role="button"
+                                tabIndex={0}
+                                onClick={onRowClick}
+                                onPointerDown={() => deletable && startLongPress(detail.id)}
+                                onPointerUp={cancelLongPress}
+                                onPointerLeave={cancelLongPress}
+                                onPointerCancel={cancelLongPress}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    onRowClick();
+                                  }
+                                }}
+                              >
+                                <span className="bar" style={{ background: info.colorVar }} />
+                                <div className="info">
+                                  <div className="name">{u}</div>
+                                  <div className="meta">
+                                    {info.desc} · {status}
+                                  </div>
+                                </div>
+                              </div>
+                              <button
+                                className={"act check" + (finished ? " on" : "")}
+                                disabled={toggling}
+                                aria-label={finished ? "取消勾選" : "標記完成"}
+                                onClick={() => quickToggle(detail, !finished)}
+                              >
+                                {finished && "✓"}
+                              </button>
                               {menuOpen && (
                                 <button
                                   className="act"
@@ -589,7 +629,7 @@ export default function SankoPage() {
                                   {rowDeleting ? "刪除中…" : "刪除"}
                                 </button>
                               )}
-                            </div>
+                            </>
                           )}
                         </div>
                       );

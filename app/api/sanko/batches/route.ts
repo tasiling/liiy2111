@@ -5,6 +5,10 @@ import { runBatch } from "@/lib/notion/client";
 import { addDays, toISODate } from "@/lib/date";
 import { SANKO_UPDATE_TYPES, normalizeDetailStatus } from "@/lib/notion/schema";
 
+// Notion 是唯一真相來源,寫入/刪除可能發生在 App 之外(擁有者直接在 Notion
+// 操作),讀取一律即時查詢,不吃 Next.js 的 Route Handler 快取,避免顯示已經
+// 在 Notion 端變動過的舊資料。
+export const dynamic = "force-dynamic";
 // 日上三更・批次建立與產出清單(委派書 v1.0)。
 // GET:回傳所有「更次」有值的明細(不限狀態),前端依「所屬 Session」分組還原
 // 成一批一批,再依對應日期展開成日期卡——不在這裡做分組,分組是純展示邏輯。

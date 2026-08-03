@@ -4,6 +4,10 @@ import { createKnowledgeEntry } from "@/lib/notion/mutations";
 import { encodePlurkContent, decodePlurkContent, plurkTemplateTitle, plurkTemplateNameFromTitle } from "@/lib/plurk/notionFormat";
 import type { PlurkTemplate } from "@/lib/plurk/logic";
 
+// Notion 是唯一真相來源,寫入/刪除可能發生在 App 之外(擁有者直接在 Notion
+// 操作),讀取一律即時查詢,不吃 Next.js 的 Route Handler 快取,避免顯示已經
+// 在 Notion 端變動過的舊資料。
+export const dynamic = "force-dynamic";
 // 噗浪・蓋樓台「範本」存 DB-14(2026-08-02 擁有者裁決),標題前綴「噗浪範本-」,
 // 內容欄序列化 method+主噗+各樓。
 export async function GET() {
