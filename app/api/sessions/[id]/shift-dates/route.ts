@@ -5,6 +5,10 @@ import { runBatch } from "@/lib/notion/client";
 import { addDays, toISODate } from "@/lib/date";
 import { normalizeDetailStatus } from "@/lib/notion/schema";
 
+// Notion 是唯一真相來源,寫入/刪除可能發生在 App 之外(擁有者直接在 Notion
+// 操作),讀取一律即時查詢,不吃 Next.js 的 Route Handler 快取,避免顯示已經
+// 在 Notion 端變動過的舊資料。
+export const dynamic = "force-dynamic";
 // P5 批次日期平移(擁有者追加指示):整批明細對應日期一次平移 offsetDays 天,
 // 用「加同一個天數」實作,結構上自動保持原本的間隔(不論逐日或未來的非連續批次)。
 // 只平移明細狀態=待產出者;已產出/已交付是歷史紀錄,只增不改,原樣跳過並列出。

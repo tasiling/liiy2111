@@ -584,6 +584,24 @@
   color: var(--muted);
   text-decoration: line-through;
 }
+/* 整列可點(擁有者 2026-08-03 修正指示):除勾選框外的區域都可以點,按下時
+   底色微變當作按壓回饋;長按才浮出刪除,不常駐佔位按鈕。 */
+.dojo .sanko .slotmain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 6px;
+  margin: -6px;
+  border-radius: 10px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+.dojo .sanko .slotmain:active {
+  background: #f0e6d4;
+}
 .dojo .sanko .act {
   flex: none;
   border: 1px solid var(--line);

@@ -3,6 +3,10 @@ import { updateKnowledgeEntry, archiveKnowledgeEntry } from "@/lib/notion/mutati
 import { encodePlurkContent, plurkDraftTitle } from "@/lib/plurk/notionFormat";
 import { deriveTitle, type PlurkDraft } from "@/lib/plurk/logic";
 
+// Notion 是唯一真相來源,寫入/刪除可能發生在 App 之外(擁有者直接在 Notion
+// 操作),讀取一律即時查詢,不吃 Next.js 的 Route Handler 快取,避免顯示已經
+// 在 Notion 端變動過的舊資料。
+export const dynamic = "force-dynamic";
 // 整筆覆寫(呼叫端永遠持有完整草稿物件),不做部分欄位合併,避免要先讀再寫。
 // createdAt 由呼叫端原樣回傳(建立時的日期,標題後綴不隨內容編輯而變動),
 // 標題的「顯示標題」部分則每次都用當下的主噗內容重新推導,讓 Notion 裡的標題

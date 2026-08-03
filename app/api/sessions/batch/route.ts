@@ -3,6 +3,10 @@ import { createSession, createDetail } from "@/lib/notion/mutations";
 import { runBatch } from "@/lib/notion/client";
 import { addDays, toISODate } from "@/lib/date";
 
+// Notion 是唯一真相來源,寫入/刪除可能發生在 App 之外(擁有者直接在 Notion
+// 操作),讀取一律即時查詢,不吃 Next.js 的 Route Handler 快取,避免顯示已經
+// 在 Notion 端變動過的舊資料。
+export const dynamic = "force-dynamic";
 // P5:批次建立 Session + N 筆明細(如 14 天大眾占卜批次)。
 // 寫入前無「預覽確認」是因為這支路由本身就是使用者按下「建立」後才呼叫;
 // 前端頁面在呼叫前應先讓使用者看過將建立的日期清單。
