@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listSankoBatchDetails } from "@/lib/notion/queries";
-import { createSession, createSankoBatchDetail } from "@/lib/notion/mutations";
+import { listSankoBatchDetails, listDetailsForSession } from "@/lib/notion/queries";
+import { createSession, createSankoBatchDetail, archiveDetail } from "@/lib/notion/mutations";
 import { runBatch } from "@/lib/notion/client";
 import { addDays, toISODate } from "@/lib/date";
-import { SANKO_UPDATE_TYPES } from "@/lib/notion/schema";
+import { SANKO_UPDATE_TYPES, normalizeDetailStatus } from "@/lib/notion/schema";
 
 // 日上三更・批次建立與產出清單(委派書 v1.0)。
 // GET:回傳所有「更次」有值的明細(不限狀態),前端依「所屬 Session」分組還原
@@ -46,5 +46,33 @@ export async function POST(req: NextRequest) {
     sessionCode: session.code,
     succeeded: result.succeeded,
     failed: result.failed,
+  });
+}
+
+// DELETE:整批刪除(?sessionId=xxx)——只刪該 Session 底下明細狀態=待產出的
+// 明細,已產出/已交付一律跳過並回報哪幾筆被跳過,不整批擋下(擁有者 2026-08-03
+// 追加指示:「整批刪除時若混有已產出的項目,只刪待產出的部分,並明確告知哪
+// 幾筆被跳過」)。以伺服器重新查詢的當下狀態為準,不信任前端快取的狀態。
+export async function DELETE(req: NextRequest) {
+  const sessionId = req.nextUrl.searchParams.get("sessionId");
+  if (!sessionId) {
+    return NextResponse.json({ error: "缺少必要參數:sessionId" }, { status: 400 });
+  }
+
+  const details = await listDetailsForSession(sessionId);
+  const deletable = details.filter((d) => normalizeDetailStatus(d.明細狀態) === "待產出");
+  const skipped = details.filter((d) => normalizeDetailStatus(d.明細狀態) !== "待產出");
+
+  const result = await runBatch(deletable, (d) => archiveDetail(d.id));
+
+  return NextResponse.json({
+    deletedCount: result.succeeded.length,
+    failed: result.failed,
+    skipped: skipped.map((d) => ({
+      id: d.id,
+      對應日期: d.對應日期,
+      更次: d.更次,
+      明細狀態: normalizeDetailStatus(d.明細狀態),
+    })),
   });
 }
