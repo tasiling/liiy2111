@@ -146,6 +146,14 @@ export const PROPOSAL_DEFAULT_STATUS = "待審" as const;
 export const KNOWLEDGE_SOURCE_REVIEW_REQUIRED = "學習筆記" as const;
 export const KNOWLEDGE_REVIEW_STATUS_FOR_LEARNING_NOTE = "待審" as const;
 
+// 日上三更・批次建立與產出清單(委派書 v1.0,2026-08-03 擁有者於 Notion 新增
+// 「更次」單選欄,方案 B 裁決:語意明確,且維持「一個 Session 涵蓋整批」的既有
+// 資料形狀,不必為了配合編號規則把一次批次動作拆成多筆 Session)。
+// 只有透過這次的批次建立流程產生的明細會有值;既有/其他管道建立的明細此欄
+// 留空,不是缺陷,單純代表「不屬於日上三更批次」,回看時不強制歸類。
+export const SANKO_UPDATE_TYPES = ["晨光", "日光", "夜光"] as const;
+export type SankoUpdateType = (typeof SANKO_UPDATE_TYPES)[number];
+
 // 噗浪・蓋樓台(2026-08-02 擁有者裁決):範本與草稿都以資料列承載於 DB-14 知識庫,
 // 不新增任何欄位或選項值——來源=原創、狀態=存貨、核可狀態=免審皆為既有選項。
 // 以標題前綴區分兩種類型,查詢時用 starts_with 篩選;內容(main/樓層/排程/狀態)
