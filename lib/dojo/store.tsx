@@ -7,8 +7,6 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import {
   INITIAL_ENTRIES,
-  GUANGXING,
-  GUANGFA,
   SPACES,
   type DojoEntry,
   type SpaceKey,
@@ -42,6 +40,14 @@ const DEFAULT_TIMER_CONFIG: TimerConfig = {
   guangfa: null,
 };
 
+export type StartTimerParams = {
+  space: SpaceKey;
+  title: string;
+  kind: string;
+  guangxing?: GuangxingKey | null;
+  guangfa?: GuangfaKey | null;
+};
+
 type DojoStore = {
   entries: DojoEntry[];
   addEntry: (entry: NewEntry) => void;
@@ -57,10 +63,12 @@ type DojoStore = {
   setTimerConfig: (config: TimerConfig) => void;
   // 雛形 startTimerFromCurrent():把目前所在場域帶入計時設定(呼叫端在此之後自行導頁到 /timer)。
   startTimerFromSpace: (space: SpaceKey) => void;
-  // 雛形 startNenTimer() 的等價實作:以某個光行或光法開始一段修行,呼叫端在
-  // 此之後自行導頁到 /timer。兩層各自獨立成一個入口,不合併成一個參數。
-  startTimerWithGuangxing: (key: GuangxingKey) => void;
-  startTimerWithGuangfa: (key: GuangfaKey) => void;
+  // 修習所各子項目「在此計時」(2026-08-03 擁有者追加指示):呼叫端直接給出
+  // 完整的 space/title/kind/光行/光法,一次覆蓋整個 timerConfig,不是像
+  // startTimerFromSpace 那樣只帶場域、其餘沿用上一次的值——驗收要求「點在此
+  // 計時進入計時器時,不需要動任何選項就能按開始」,子項目名稱必須直接對上
+  // 「你在練什麼」,不能是「修習所:一段修行」這種泛稱。
+  startTimerWith: (params: StartTimerParams) => void;
 };
 
 const DojoContext = createContext<DojoStore | null>(null);
@@ -112,25 +120,13 @@ export function DojoProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
-  const startTimerWithGuangxing = useCallback((key: GuangxingKey) => {
-    const v = GUANGXING[key];
+  const startTimerWith = useCallback((params: StartTimerParams) => {
     setTimerConfig({
-      space: "practice",
-      title: `${v[0]}:${v[2].split("、")[0]}`,
-      kind: `光行／${v[0]}`,
-      guangxing: key,
-      guangfa: null,
-    });
-  }, []);
-
-  const startTimerWithGuangfa = useCallback((key: GuangfaKey) => {
-    const v = GUANGFA[key];
-    setTimerConfig({
-      space: "practice",
-      title: `${v[0]}:${v[2].split("、")[0]}`,
-      kind: `光法／${v[0]}`,
-      guangxing: null,
-      guangfa: key,
+      space: params.space,
+      title: params.title,
+      kind: params.kind,
+      guangxing: params.guangxing ?? null,
+      guangfa: params.guangfa ?? null,
     });
   }, []);
 
@@ -149,8 +145,7 @@ export function DojoProvider({ children }: { children: ReactNode }) {
       timerConfig,
       setTimerConfig,
       startTimerFromSpace,
-      startTimerWithGuangxing,
-      startTimerWithGuangfa,
+      startTimerWith,
     }),
     [
       entries,
@@ -165,8 +160,7 @@ export function DojoProvider({ children }: { children: ReactNode }) {
       closeQuickAdd,
       timerConfig,
       startTimerFromSpace,
-      startTimerWithGuangxing,
-      startTimerWithGuangfa,
+      startTimerWith,
     ]
   );
 

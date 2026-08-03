@@ -11,7 +11,9 @@ import { SPACES, GUANGXING, GUANGFA, type SpaceKey, type GuangxingKey, type Guan
 import { formatTimer } from "@/lib/dojo/format";
 
 const MINUTE_OPTIONS = [25, 45, 60, 90];
-const TIMER_SPACE_KEYS = (Object.keys(SPACES) as SpaceKey[]).filter((k) => k !== "closing" && k !== "dao");
+// 收光是結束動作,不是投入時間的場域,排除;道藏(2026-08-03 擁有者追加指示)
+// 補回清單——目前只排除收光。
+const TIMER_SPACE_KEYS = (Object.keys(SPACES) as SpaceKey[]).filter((k) => k !== "closing");
 
 export default function TimerPage() {
   const router = useRouter();

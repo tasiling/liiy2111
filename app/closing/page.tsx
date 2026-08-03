@@ -15,6 +15,17 @@
 // 清除,清除其中一個不影響另一個;顯示格式集中在 formatFreqIntensityLabel()
 // (兩者皆有:"500・愛 ・ 強度 7";只有一項就只顯示那一項),不在這裡另外拼字串。
 //
+// 追加修正(2026-08-03,擁有者回報「滑桿一動即寫入,無確認、無收合、清除鈕
+// 常駐」):改成三態——未標記顯示「標記頻率」「標記強度」兩顆入口按鈕;點下
+// 任一顆展開「頻率＋強度」共用的編輯面板(滑桿改成先寫進本地暫存值,不即時
+// 寫入 entries),按「確定」才真的呼叫 setEntryFreq/setEntryIntensity,「取消」
+// 直接關閉、捨棄暫存值;已標記(至少一項有值)收合成一行(用既有的
+// formatFreqIntensityLabel())＋一顆「編輯」按鈕,點編輯才重新展開。清除鈕
+// 移到展開面板內,只有該欄位原本已有值時才顯示,按下去立即清除並收合。用
+// touched 旗標追蹤這次編輯階段使用者實際動過哪個欄位,「確定」只寫入動過的
+// 欄位——避免使用者只想標頻率,卻因為面板同時顯示兩個滑桿而意外把強度也寫進
+// 預設值,維持「只填其中一項完全合法」的既有規則。
+//
 // 《收光三選項與居所接續 — 資料邏輯規格 v1.0》(2026-08-03,擁有者裁決零新增
 // 欄位,沿用 DojoEntry 語意寫進 DB-14):三個選項是「今天整體怎麼結束」的一次性
 // 動作,不改動任何一筆痕跡的狀態(§0.1)——這裡呼叫 POST /api/closing,不碰
@@ -24,7 +35,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useDojo } from "@/lib/dojo/store";
-import { SPACES, GUANGXING, GUANGFA } from "@/lib/dojo/constants";
+import { SPACES, GUANGXING, GUANGFA, type DojoEntry } from "@/lib/dojo/constants";
 import {
   resolveHawkinsLevel,
   formatFreqIntensityLabel,
@@ -48,7 +59,7 @@ const DEFAULT_INTENSITY = 5;
 
 export default function ClosingPage() {
   const router = useRouter();
-  const { entries, setEntryFreq, setEntryIntensity } = useDojo();
+  const { entries } = useDojo();
   const todayEntries = entries.filter((e) => e.date === "今天" || e.date === "剛剛");
 
   // 「帶回明天」是唯一有額外步驟的選項:點下去先展開一句話輸入框(可留空),
@@ -96,108 +107,26 @@ export default function ClosingPage() {
       <h3>復盤測頻</h3>
       <p className="lead">願不願意標記當時的能量與投入程度;不測也完全可以。</p>
       {todayEntries.length === 0 && <div className="empty">今天還沒有片刻可以復盤。</div>}
-      {todayEntries.map((e) => {
-        const level = e.freq != null ? resolveHawkinsLevel(e.freq) : null;
-        const combinedLabel = formatFreqIntensityLabel(e.freq, e.intensity);
-        return (
-          <div key={e.id} className={`item ${SPACES[e.space]?.[1] ?? "dw"}`}>
-            <span className="status">
-              <span className="dot" />
-              {SPACES[e.space]?.[0]} · {e.kind}
+      {todayEntries.map((e) => (
+        <div key={e.id} className={`item ${SPACES[e.space]?.[1] ?? "dw"}`}>
+          <span className="status">
+            <span className="dot" />
+            {SPACES[e.space]?.[0]} · {e.kind}
+          </span>
+          {e.guangxing && (
+            <span className="tag" style={{ borderColor: "var(--gold)", color: "var(--gold)" }}>
+              {GUANGXING[e.guangxing][0]}
             </span>
-            {e.guangxing && (
-              <span className="tag" style={{ borderColor: "var(--gold)", color: "var(--gold)" }}>
-                {GUANGXING[e.guangxing][0]}
-              </span>
-            )}
-            {e.guangfa && (
-              <span className="tag" style={{ borderColor: "var(--gold)", color: "var(--gold)" }}>
-                {GUANGFA[e.guangfa][0]}
-              </span>
-            )}
-            <b>{e.title}</b>
-            {combinedLabel && (
-              <span
-                className="tag"
-                style={{ borderColor: level?.color ?? "var(--gold)", color: level?.color ?? "var(--gold)", marginTop: 6 }}
-              >
-                {combinedLabel}
-              </span>
-            )}
-
-            <small style={{ display: "block", marginTop: 8 }}>頻率(0–1000)</small>
-            {e.freq != null ? (
-              <>
-                <div className="two" style={{ marginTop: 4, alignItems: "center" }}>
-                  <input
-                    type="range"
-                    min={HAWKINS_MIN}
-                    max={HAWKINS_MAX}
-                    step={5}
-                    value={e.freq}
-                    onChange={(ev) => setEntryFreq(e.id, Number(ev.target.value))}
-                  />
-                  <input
-                    className="field"
-                    style={{ margin: 0 }}
-                    type="number"
-                    min={HAWKINS_MIN}
-                    max={HAWKINS_MAX}
-                    value={e.freq}
-                    onChange={(ev) => {
-                      const n = Number(ev.target.value);
-                      if (Number.isFinite(n)) setEntryFreq(e.id, Math.min(HAWKINS_MAX, Math.max(HAWKINS_MIN, n)));
-                    }}
-                  />
-                </div>
-                <button className="danger" style={{ marginTop: 6 }} onClick={() => setEntryFreq(e.id, null)}>
-                  清除頻率
-                </button>
-              </>
-            ) : (
-              <button style={{ marginTop: 6 }} onClick={() => setEntryFreq(e.id, DEFAULT_FREQ)}>
-                標記頻率
-              </button>
-            )}
-
-            <small style={{ display: "block", marginTop: 10 }}>強度(1–10)</small>
-            {e.intensity != null ? (
-              <>
-                <div className="two" style={{ marginTop: 4, alignItems: "center" }}>
-                  <input
-                    type="range"
-                    min={INTENSITY_MIN}
-                    max={INTENSITY_MAX}
-                    step={1}
-                    value={e.intensity}
-                    onChange={(ev) => setEntryIntensity(e.id, Number(ev.target.value))}
-                  />
-                  <input
-                    className="field"
-                    style={{ margin: 0 }}
-                    type="number"
-                    min={INTENSITY_MIN}
-                    max={INTENSITY_MAX}
-                    value={e.intensity}
-                    onChange={(ev) => {
-                      const n = Number(ev.target.value);
-                      if (Number.isFinite(n))
-                        setEntryIntensity(e.id, Math.min(INTENSITY_MAX, Math.max(INTENSITY_MIN, n)));
-                    }}
-                  />
-                </div>
-                <button className="danger" style={{ marginTop: 6 }} onClick={() => setEntryIntensity(e.id, null)}>
-                  清除強度
-                </button>
-              </>
-            ) : (
-              <button style={{ marginTop: 6 }} onClick={() => setEntryIntensity(e.id, DEFAULT_INTENSITY)}>
-                標記強度
-              </button>
-            )}
-          </div>
-        );
-      })}
+          )}
+          {e.guangfa && (
+            <span className="tag" style={{ borderColor: "var(--gold)", color: "var(--gold)" }}>
+              {GUANGFA[e.guangfa][0]}
+            </span>
+          )}
+          <b>{e.title}</b>
+          <ClosingMeasurePanel entry={e} />
+        </div>
+      ))}
 
       <h3>今天怎麼處置</h3>
       {error && <div className="warn">{error}</div>}
@@ -243,5 +172,153 @@ export default function ClosingPage() {
         測試重點:三個處置選項是否足夠;復盤測頻是否讓人有壓力(不測也完全合法,不應該有任何提示要求一定要測)。
       </div>
     </section>
+  );
+}
+
+// 頻率／強度共用一個編輯面板(未標記→展開中→已標記三態,見檔案開頭註解)。
+function ClosingMeasurePanel({ entry }: { entry: DojoEntry }) {
+  const { setEntryFreq, setEntryIntensity } = useDojo();
+  const [editing, setEditing] = useState(false);
+  const [pendingFreq, setPendingFreq] = useState(entry.freq ?? DEFAULT_FREQ);
+  const [touchedFreq, setTouchedFreq] = useState(entry.freq != null);
+  const [pendingIntensity, setPendingIntensity] = useState(entry.intensity ?? DEFAULT_INTENSITY);
+  const [touchedIntensity, setTouchedIntensity] = useState(entry.intensity != null);
+
+  const level = entry.freq != null ? resolveHawkinsLevel(entry.freq) : null;
+  const combinedLabel = formatFreqIntensityLabel(entry.freq, entry.intensity);
+  const hasAny = entry.freq != null || entry.intensity != null;
+
+  function openEdit() {
+    // 展開時把暫存值重設回目前實際值,不會殘留上一次取消掉的操作。
+    setPendingFreq(entry.freq ?? DEFAULT_FREQ);
+    setTouchedFreq(entry.freq != null);
+    setPendingIntensity(entry.intensity ?? DEFAULT_INTENSITY);
+    setTouchedIntensity(entry.intensity != null);
+    setEditing(true);
+  }
+
+  function confirm() {
+    // 只寫入這次編輯階段真的動過的欄位,沒動過的維持原狀(不會被面板上顯示的
+    // 預設滑桿位置意外寫入)。
+    if (touchedFreq) setEntryFreq(entry.id, pendingFreq);
+    if (touchedIntensity) setEntryIntensity(entry.id, pendingIntensity);
+    setEditing(false);
+  }
+
+  function cancel() {
+    // 未按確定即離開,不寫入——暫存值直接捨棄。
+    setEditing(false);
+  }
+
+  function clearFreqNow() {
+    setEntryFreq(entry.id, null);
+    setTouchedFreq(false);
+    setPendingFreq(DEFAULT_FREQ);
+  }
+
+  function clearIntensityNow() {
+    setEntryIntensity(entry.id, null);
+    setTouchedIntensity(false);
+    setPendingIntensity(DEFAULT_INTENSITY);
+  }
+
+  if (!editing) {
+    if (!hasAny) {
+      return (
+        <div className="two" style={{ marginTop: 8 }}>
+          <button onClick={openEdit}>標記頻率</button>
+          <button onClick={openEdit}>標記強度</button>
+        </div>
+      );
+    }
+    return (
+      <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <span className="tag" style={{ borderColor: level?.color ?? "var(--gold)", color: level?.color ?? "var(--gold)" }}>
+          {combinedLabel}
+        </span>
+        <button onClick={openEdit}>編輯</button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      <small style={{ display: "block" }}>頻率(0–1000)</small>
+      <div className="two" style={{ marginTop: 4, alignItems: "center" }}>
+        <input
+          type="range"
+          min={HAWKINS_MIN}
+          max={HAWKINS_MAX}
+          step={5}
+          value={pendingFreq}
+          onChange={(ev) => {
+            setPendingFreq(Number(ev.target.value));
+            setTouchedFreq(true);
+          }}
+        />
+        <input
+          className="field"
+          style={{ margin: 0 }}
+          type="number"
+          min={HAWKINS_MIN}
+          max={HAWKINS_MAX}
+          value={pendingFreq}
+          onChange={(ev) => {
+            const n = Number(ev.target.value);
+            if (Number.isFinite(n)) {
+              setPendingFreq(Math.min(HAWKINS_MAX, Math.max(HAWKINS_MIN, n)));
+              setTouchedFreq(true);
+            }
+          }}
+        />
+      </div>
+      {entry.freq != null && (
+        <button className="danger" style={{ marginTop: 4 }} onClick={clearFreqNow}>
+          清除頻率
+        </button>
+      )}
+
+      <small style={{ display: "block", marginTop: 12 }}>強度(1–10)</small>
+      <div className="two" style={{ marginTop: 4, alignItems: "center" }}>
+        <input
+          type="range"
+          min={INTENSITY_MIN}
+          max={INTENSITY_MAX}
+          step={1}
+          value={pendingIntensity}
+          onChange={(ev) => {
+            setPendingIntensity(Number(ev.target.value));
+            setTouchedIntensity(true);
+          }}
+        />
+        <input
+          className="field"
+          style={{ margin: 0 }}
+          type="number"
+          min={INTENSITY_MIN}
+          max={INTENSITY_MAX}
+          value={pendingIntensity}
+          onChange={(ev) => {
+            const n = Number(ev.target.value);
+            if (Number.isFinite(n)) {
+              setPendingIntensity(Math.min(INTENSITY_MAX, Math.max(INTENSITY_MIN, n)));
+              setTouchedIntensity(true);
+            }
+          }}
+        />
+      </div>
+      {entry.intensity != null && (
+        <button className="danger" style={{ marginTop: 4 }} onClick={clearIntensityNow}>
+          清除強度
+        </button>
+      )}
+
+      <div className="two" style={{ marginTop: 10 }}>
+        <button onClick={cancel}>取消</button>
+        <button className="primary" onClick={confirm}>
+          確定
+        </button>
+      </div>
+    </div>
   );
 }
