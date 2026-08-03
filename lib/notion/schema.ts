@@ -160,3 +160,10 @@ export type SankoUpdateType = (typeof SANKO_UPDATE_TYPES)[number];
 // 序列化存進「內容」欄,見 lib/plurk/notionFormat.ts。
 export const PLURK_TEMPLATE_TITLE_PREFIX = "噗浪範本-";
 export const PLURK_DRAFT_TITLE_PREFIX = "噗浪草稿-";
+
+// 收光(《收光三選項與居所接續 — 資料邏輯規格 v1.0》,2026-08-03 擁有者裁決:
+// 「不要為此新增任何欄位」,零 schema 異動,沿用 DB-14 知識庫,比照噗浪・蓋樓台
+// 先例)。一天一筆,標題「收光紀錄-YYYYMMDD」,寫入時若當日已有紀錄則覆蓋
+// (擁有者可能改變主意),不累積多筆。內容欄序列化 DojoEntry 語意的
+// space/kind/title/note/date,見 lib/closing/notionFormat.ts。
+export const CLOSING_TITLE_PREFIX = "收光紀錄-";

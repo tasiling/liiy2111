@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useDojo } from "@/lib/dojo/store";
-import { SPACES, LIGHT_NEN, type SpaceKey, type NenKey } from "@/lib/dojo/constants";
+import { SPACES, GUANGXING, GUANGFA, type SpaceKey, type GuangxingKey, type GuangfaKey } from "@/lib/dojo/constants";
 import { formatTimer } from "@/lib/dojo/format";
 
 const MINUTE_OPTIONS = [25, 45, 60, 90];
@@ -24,7 +24,8 @@ export default function TimerPage() {
   const [space, setSpace] = useState<SpaceKey>(timerConfig.space);
   const [title, setTitle] = useState(timerConfig.title);
   const [kind, setKind] = useState(timerConfig.kind);
-  const [nen, setNen] = useState<NenKey | null>(timerConfig.nen);
+  const [guangxing, setGuangxing] = useState<GuangxingKey | null>(timerConfig.guangxing);
+  const [guangfa, setGuangfa] = useState<GuangfaKey | null>(timerConfig.guangfa);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -70,7 +71,8 @@ export default function TimerPage() {
       kind,
       note: `修行計時 ${spent} 分鐘`,
       privacy: "私人",
-      nen,
+      guangxing,
+      guangfa,
     });
     setRemainingSeconds(initialSeconds);
     router.push("/practice");
@@ -126,10 +128,25 @@ export default function TimerPage() {
           placeholder="例如:知的覺察、創作草稿、服務準備"
         />
 
-        <label>光念(選填)</label>
+        <label>光行(選填)</label>
         <div className="row">
-          {(Object.entries(LIGHT_NEN) as [NenKey, (typeof LIGHT_NEN)[NenKey]][]).map(([k, v]) => (
-            <button key={k} className={nen === k ? "on" : ""} onClick={() => setNen(k)}>
+          <button className={guangxing === null ? "on" : ""} onClick={() => setGuangxing(null)}>
+            不特別標記
+          </button>
+          {(Object.entries(GUANGXING) as [GuangxingKey, (typeof GUANGXING)[GuangxingKey]][]).map(([k, v]) => (
+            <button key={k} className={guangxing === k ? "on" : ""} onClick={() => setGuangxing(k)}>
+              {v[0]}
+            </button>
+          ))}
+        </div>
+
+        <label>光法(選填)</label>
+        <div className="row">
+          <button className={guangfa === null ? "on" : ""} onClick={() => setGuangfa(null)}>
+            不特別標記
+          </button>
+          {(Object.entries(GUANGFA) as [GuangfaKey, (typeof GUANGFA)[GuangfaKey]][]).map(([k, v]) => (
+            <button key={k} className={guangfa === k ? "on" : ""} onClick={() => setGuangfa(k)}>
               {v[0]}
             </button>
           ))}

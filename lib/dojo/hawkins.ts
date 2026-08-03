@@ -70,3 +70,20 @@ export function resolveFreqBand(value: number): FreqBand {
   if (value <= 666) return "mid";
   return "deep";
 }
+
+// 強度(修正委派書 v1.0 四):1–10,與頻率並列、規則相同(單筆完整資訊保留,
+// 不算平均、不畫進度條、不進趨勢圖、居所不顯示、系統不自動推算)。強度沒有
+// 霍金斯量表那種命名等級,單純是 1–10 的原始數字,所以只需要範圍常數與格式化,
+// 不需要像頻率一樣的等級表。
+export const INTENSITY_MIN = 1;
+export const INTENSITY_MAX = 10;
+
+// 委派書 v1.0 四之顯示格式,兩個欄位各自獨立、任一缺席都合法:
+// 都有:"500・愛 ・ 強度 7";只有頻率:"500・愛";只有強度:"強度 7"。
+// 集中成一個函式,避免各頁面各自組字串,格式跑出微妙差異(如全形/半形頓號)。
+export function formatFreqIntensityLabel(freq: number | null | undefined, intensity: number | null | undefined): string {
+  const parts: string[] = [];
+  if (freq != null) parts.push(formatHawkinsLabel(freq));
+  if (intensity != null) parts.push(`強度 ${intensity}`);
+  return parts.join(" ・ ");
+}

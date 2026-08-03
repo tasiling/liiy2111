@@ -4,7 +4,7 @@
 // 這裡照樣只做視覺呈現,不額外加點擊邏輯。擁有者指示:牌卡庫、知識庫掛進這裡,
 // 但兩者目前都還沒有獨立頁面(只在其他功能內部被讀取),先列出並標明未建置。
 import { useDojo } from "@/lib/dojo/store";
-import { SPACES, LIGHT_NEN, type SpaceKey } from "@/lib/dojo/constants";
+import { SPACES, GUANGXING, GUANGFA, type SpaceKey } from "@/lib/dojo/constants";
 import ExistingFeatureLinks from "../components/ExistingFeatureLinks";
 
 const ARCHIVE_SOURCE_SPACES: SpaceKey[] = ["weaving", "practice", "forage"];
@@ -31,9 +31,14 @@ export default function DaoPage() {
       </div>
       {archivable.map((e) => (
         <div key={e.id} className="item da">
-          {e.nen && (
+          {e.guangxing && (
             <span className="tag" style={{ borderColor: "var(--gold)", color: "var(--gold)" }}>
-              {LIGHT_NEN[e.nen][0]}
+              {GUANGXING[e.guangxing][0]}
+            </span>
+          )}
+          {e.guangfa && (
+            <span className="tag" style={{ borderColor: "var(--gold)", color: "var(--gold)" }}>
+              {GUANGFA[e.guangfa][0]}
             </span>
           )}
           <b>{e.title}</b>

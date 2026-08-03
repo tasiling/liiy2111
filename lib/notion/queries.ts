@@ -418,6 +418,16 @@ export async function listPlurkDrafts() {
   return pages.map(mapKnowledge);
 }
 
+// 依標題精確比對找單一 DB-14 資料列(收光紀錄一天一筆,靠標題「收光紀錄-
+// YYYYMMDD」精確比對找出當天/昨天那一筆,不是前綴掃描整批)。
+export async function findKnowledgeEntryByTitle(title: string) {
+  const pages = await queryAll(DATA_SOURCES.DB14_知識庫, {
+    property: "標題",
+    title: { equals: title },
+  });
+  return pages[0] ? mapKnowledge(pages[0]) : null;
+}
+
 // --- DB-11 服務原子庫:P3 第 2 步「服務組合」支援,依月主題包能量關鍵字比對 ---
 export function mapAtom(p: NotionPage) {
   return {
