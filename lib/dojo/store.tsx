@@ -5,7 +5,16 @@
 // 行為與雛形的全域陣列+單一 modal 相同:重新整理頁面會重置,不持久化。
 
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
-import { INITIAL_ENTRIES, LIGHT_NEN, SPACES, type DojoEntry, type SpaceKey, type NenKey } from "./constants";
+import {
+  INITIAL_ENTRIES,
+  GUANGXING,
+  GUANGFA,
+  SPACES,
+  type DojoEntry,
+  type SpaceKey,
+  type GuangxingKey,
+  type GuangfaKey,
+} from "./constants";
 
 type NewEntry = Omit<DojoEntry, "id" | "date">;
 
@@ -17,13 +26,20 @@ export type QuickAddOptions = {
   presetKind?: string;
 };
 
-export type TimerConfig = { space: SpaceKey; kind: string; title: string; nen: NenKey | null };
+export type TimerConfig = {
+  space: SpaceKey;
+  kind: string;
+  title: string;
+  guangxing: GuangxingKey | null;
+  guangfa: GuangfaKey | null;
+};
 
 const DEFAULT_TIMER_CONFIG: TimerConfig = {
   space: "practice",
   kind: "修行計時",
   title: "一段修行",
-  nen: null,
+  guangxing: null,
+  guangfa: null,
 };
 
 type DojoStore = {
@@ -32,6 +48,7 @@ type DojoStore = {
   updateEntry: (id: number, entry: NewEntry) => void;
   removeEntry: (id: number) => void;
   setEntryFreq: (id: number, freq: number | null) => void;
+  setEntryIntensity: (id: number, intensity: number | null) => void;
   modalOpen: boolean;
   modalOptions: QuickAddOptions;
   openQuickAdd: (opts?: QuickAddOptions) => void;
@@ -40,8 +57,10 @@ type DojoStore = {
   setTimerConfig: (config: TimerConfig) => void;
   // 雛形 startTimerFromCurrent():把目前所在場域帶入計時設定(呼叫端在此之後自行導頁到 /timer)。
   startTimerFromSpace: (space: SpaceKey) => void;
-  // 雛形 startNenTimer():以某個光念開始一段修行,呼叫端在此之後自行導頁到 /timer。
-  startTimerWithNen: (nen: NenKey) => void;
+  // 雛形 startNenTimer() 的等價實作:以某個光行或光法開始一段修行,呼叫端在
+  // 此之後自行導頁到 /timer。兩層各自獨立成一個入口,不合併成一個參數。
+  startTimerWithGuangxing: (key: GuangxingKey) => void;
+  startTimerWithGuangfa: (key: GuangfaKey) => void;
 };
 
 const DojoContext = createContext<DojoStore | null>(null);
@@ -71,6 +90,13 @@ export function DojoProvider({ children }: { children: ReactNode }) {
     setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, freq: freq ?? undefined } : e)));
   }, []);
 
+  // 強度與頻率是兩個獨立欄位(修正委派書 v1.0 四):各自獨立的 setter,清除
+  // 其中一個不會動到另一個——不要合併成同一個函式再用參數判斷要改哪一個,
+  // 那樣呼叫端反而更容易誤觸另一個欄位。
+  const setEntryIntensity = useCallback((id: number, intensity: number | null) => {
+    setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, intensity: intensity ?? undefined } : e)));
+  }, []);
+
   const openQuickAdd = useCallback((opts: QuickAddOptions = {}) => {
     setModalOptions(opts);
     setModalOpen(true);
@@ -86,13 +112,25 @@ export function DojoProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
-  const startTimerWithNen = useCallback((nen: NenKey) => {
-    const v = LIGHT_NEN[nen];
+  const startTimerWithGuangxing = useCallback((key: GuangxingKey) => {
+    const v = GUANGXING[key];
     setTimerConfig({
       space: "practice",
       title: `${v[0]}:${v[2].split("、")[0]}`,
-      kind: `光念／${v[0]}`,
-      nen,
+      kind: `光行／${v[0]}`,
+      guangxing: key,
+      guangfa: null,
+    });
+  }, []);
+
+  const startTimerWithGuangfa = useCallback((key: GuangfaKey) => {
+    const v = GUANGFA[key];
+    setTimerConfig({
+      space: "practice",
+      title: `${v[0]}:${v[2].split("、")[0]}`,
+      kind: `光法／${v[0]}`,
+      guangxing: null,
+      guangfa: key,
     });
   }, []);
 
@@ -103,6 +141,7 @@ export function DojoProvider({ children }: { children: ReactNode }) {
       updateEntry,
       removeEntry,
       setEntryFreq,
+      setEntryIntensity,
       modalOpen,
       modalOptions,
       openQuickAdd,
@@ -110,7 +149,8 @@ export function DojoProvider({ children }: { children: ReactNode }) {
       timerConfig,
       setTimerConfig,
       startTimerFromSpace,
-      startTimerWithNen,
+      startTimerWithGuangxing,
+      startTimerWithGuangfa,
     }),
     [
       entries,
@@ -118,13 +158,15 @@ export function DojoProvider({ children }: { children: ReactNode }) {
       updateEntry,
       removeEntry,
       setEntryFreq,
+      setEntryIntensity,
       modalOpen,
       modalOptions,
       openQuickAdd,
       closeQuickAdd,
       timerConfig,
       startTimerFromSpace,
-      startTimerWithNen,
+      startTimerWithGuangxing,
+      startTimerWithGuangfa,
     ]
   );
 

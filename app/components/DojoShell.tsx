@@ -2,13 +2,22 @@
 
 // 行光道場外殼:雛形的頂部列 + 底部五項固定導航 + 快速新增 bottom sheet。
 // 版面結構與互動邏輯沿用雛形(go()/openForm()/saveEntry() 的等價實作),不重新設計。
-// 修掉雛形本身的問題:快速新增表單原本用 <select> 選場域/光念/隱私,這裡全部
-// 改成按鈕列(照雛形計時器頁「setMinutes/pickTimerSpace/pickTimerNen」的按鈕列做法)。
+// 修掉雛形本身的問題:快速新增表單原本用 <select> 選場域/光行光法/隱私,這裡
+// 全部改成按鈕列(照雛形計時器頁「setMinutes/pickTimerSpace/pickTimerNen」的
+// 按鈕列做法)。
 
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useDojo } from "@/lib/dojo/store";
-import { SPACES, LIGHT_NEN, type SpaceKey, type NenKey, type Privacy } from "@/lib/dojo/constants";
+import {
+  SPACES,
+  GUANGXING,
+  GUANGFA,
+  type SpaceKey,
+  type GuangxingKey,
+  type GuangfaKey,
+  type Privacy,
+} from "@/lib/dojo/constants";
 import { useBackStack, useBackableState } from "@/lib/dojo/backstack";
 import { PARENT_ROUTE, ROUTE_LABEL, USE_BROWSER_BACK, NO_BACK_BUTTON } from "@/lib/dojo/backroutes";
 
@@ -134,7 +143,15 @@ function QuickAddModal({
   onClose,
   onSave,
 }: {
-  entry?: { title: string; note?: string; space: SpaceKey; kind: string; nen: NenKey | null; privacy: Privacy };
+  entry?: {
+    title: string;
+    note?: string;
+    space: SpaceKey;
+    kind: string;
+    guangxing: GuangxingKey | null;
+    guangfa: GuangfaKey | null;
+    privacy: Privacy;
+  };
   presetSpace?: SpaceKey;
   presetKind?: string;
   onClose: () => void;
@@ -143,7 +160,8 @@ function QuickAddModal({
     note?: string;
     space: SpaceKey;
     kind: string;
-    nen: NenKey | null;
+    guangxing: GuangxingKey | null;
+    guangfa: GuangfaKey | null;
     privacy: Privacy;
   }) => void;
 }) {
@@ -151,7 +169,8 @@ function QuickAddModal({
   const [note, setNote] = useState(entry?.note ?? "");
   const [space, setSpace] = useState<SpaceKey>(entry?.space ?? presetSpace ?? "practice");
   const [kind, setKind] = useState(entry?.kind ?? presetKind ?? "");
-  const [nen, setNen] = useState<NenKey | null>(entry?.nen ?? null);
+  const [guangxing, setGuangxing] = useState<GuangxingKey | null>(entry?.guangxing ?? null);
+  const [guangfa, setGuangfa] = useState<GuangfaKey | null>(entry?.guangfa ?? null);
   const [privacy, setPrivacy] = useState<Privacy>(entry?.privacy ?? "私人");
   const [error, setError] = useState<string | null>(null);
 
@@ -169,7 +188,15 @@ function QuickAddModal({
       setError("請先留下一個標題或一句話。");
       return;
     }
-    onSave({ title: title.trim(), note: note.trim() || undefined, space, kind: kind.trim() || "未分類", nen, privacy });
+    onSave({
+      title: title.trim(),
+      note: note.trim() || undefined,
+      space,
+      kind: kind.trim() || "未分類",
+      guangxing,
+      guangfa,
+      privacy,
+    });
   }
 
   return (
@@ -213,13 +240,25 @@ function QuickAddModal({
           placeholder="例如:心／情、提問、草稿"
         />
 
-        <label>光念(選填)</label>
+        <label>光行(選填)</label>
         <div className="row">
-          <button className={nen === null ? "on" : ""} onClick={() => setNen(null)}>
+          <button className={guangxing === null ? "on" : ""} onClick={() => setGuangxing(null)}>
             不特別標記
           </button>
-          {Object.entries(LIGHT_NEN).map(([k, v]) => (
-            <button key={k} className={nen === k ? "on" : ""} onClick={() => setNen(k as NenKey)}>
+          {Object.entries(GUANGXING).map(([k, v]) => (
+            <button key={k} className={guangxing === k ? "on" : ""} onClick={() => setGuangxing(k as GuangxingKey)}>
+              {v[0]}
+            </button>
+          ))}
+        </div>
+
+        <label>光法(選填)</label>
+        <div className="row">
+          <button className={guangfa === null ? "on" : ""} onClick={() => setGuangfa(null)}>
+            不特別標記
+          </button>
+          {Object.entries(GUANGFA).map(([k, v]) => (
+            <button key={k} className={guangfa === k ? "on" : ""} onClick={() => setGuangfa(k as GuangfaKey)}>
               {v[0]}
             </button>
           ))}

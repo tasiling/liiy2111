@@ -45,11 +45,25 @@ export async function POST(req: NextRequest) {
     createSankoBatchDetail({ sessionId: session.id, sessionCode: session.code, 對應日期: date, 序, 更次 })
   );
 
+  // 修正委派書 v1.0 一之 4:預覽與寫入結果必須一致——回傳「實際成功寫入」的
+  // 日期範圍與筆數,而不是直接照抄請求參數(days/startDate)回填。兩者在全部
+  // 成功時會相同,但只要有任何一筆失敗(如逐筆重試 3 次後仍失敗的暫時性錯誤),
+  // 就必須讓呼叫端看得出實際寫入的與預期的不一致,而不是照樣回報「已建立
+  // 整批」掩蓋掉部分寫入失敗的事實。
+  // jobs 依日期升冪排出,runBatch 的 failed.input 與 jobs 是同一參照,可用來
+  // 篩出真正成功的子集合,篩選後仍維持原本的日期升冪順序。
+  const failedJobs = new Set(result.failed.map((f) => f.input));
+  const actualJobs = jobs.filter((j) => !failedJobs.has(j));
+
   return NextResponse.json({
     sessionId: session.id,
     sessionCode: session.code,
     succeeded: result.succeeded,
     failed: result.failed,
+    expectedCount: jobs.length,
+    actualCount: actualJobs.length,
+    actualStart: actualJobs.length ? actualJobs[0].date : null,
+    actualEnd: actualJobs.length ? actualJobs[actualJobs.length - 1].date : null,
   });
 }
 

@@ -13,6 +13,7 @@ type CalendarItem = {
   id: string;
   日期: string | null;
   標題: string;
+  更次?: string | null;
   項目用途?: string | null;
   當場主題?: string;
   狀態: string | null;
@@ -156,7 +157,15 @@ export default function DashboardPage() {
           <h3 className="text-xs font-medium text-zinc-500 mb-2">
             單筆 Session(依 DB-03 狀態機,共 {data.completion.single.total} 筆)
           </h3>
-          <div className="grid grid-cols-5 gap-2 text-xs text-center mb-4">
+          {/* 這個頁面掛在 .dojo 殼層底下,Tailwind 的 .grid 工具類別會被 dojo.css
+              的 `.dojo .grid`(場域選單用的固定 2 欄版型)蓋掉 grid-template-columns
+              ——兩者類別名稱字面相同但語意無關,選擇器特異度 .dojo .grid 又比
+              Tailwind 的 .grid/.grid-cols-N 高,一定會贏。這裡改用 inline style
+              直接指定欄數,不吃到那條規則。 */}
+          <div
+            className="gap-2 text-xs text-center mb-4"
+            style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)" }}
+          >
             {STATUS_ORDER.map((s) => (
               <div key={s}>
                 <div className="font-semibold">{data.completion.single.byStatus[s] ?? 0}</div>
@@ -168,7 +177,10 @@ export default function DashboardPage() {
           <h3 className="text-xs font-medium text-zinc-500 mb-2">
             批次 Session 明細(依 DB-04 明細狀態,共 {data.completion.batch.total} 筆)
           </h3>
-          <div className="grid grid-cols-3 gap-2 text-xs text-center">
+          <div
+            className="gap-2 text-xs text-center"
+            style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)" }}
+          >
             {DETAIL_STATUS_ORDER.map((s) => (
               <div key={s}>
                 <div className="font-semibold">{data.completion.batch.byStatus[s] ?? 0}</div>
@@ -182,14 +194,20 @@ export default function DashboardPage() {
       {data && (
         <section className="border border-black/10 dark:border-white/15 rounded-lg p-4">
           <h2 className="font-medium mb-3">行事曆</h2>
-          <div className="grid grid-cols-7 gap-1 text-center text-xs text-zinc-500 mb-1">
+          {/* 修正委派書 v1.0 二:同樣的 .dojo .grid 類別碰撞問題(見上方完成度
+              儀表的註解),星期標頭與每週日期格都改用 inline style 明確指定
+              repeat(7, 1fr),不依賴 Tailwind 的 .grid 工具類別。 */}
+          <div
+            className="gap-1 text-center text-xs text-zinc-500 mb-1"
+            style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}
+          >
             {WEEKDAY_LABELS.map((w) => (
               <div key={w}>{w}</div>
             ))}
           </div>
           <div className="flex flex-col gap-1">
             {weeks.map((week, wi) => (
-              <div key={wi} className="grid grid-cols-7 gap-1">
+              <div key={wi} className="gap-1" style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
                 {week.map((cell) => {
                   const items = byDay.get(cell.iso) ?? [];
                   const isToday = cell.iso === data.today;
@@ -210,9 +228,20 @@ export default function DashboardPage() {
                       <span className={`text-xs ${isToday ? "font-bold text-blue-700 dark:text-blue-300" : ""}`}>
                         {cell.date.getDate()}
                       </span>
-                      {/* 同日多筆任務全數堆疊顯示,不截斷——實測情境為每日 2–3 筆。 */}
+                      {/* 同日多筆任務全數堆疊顯示,不截斷——實測情境為每日 2–3 筆。
+                          有「更次」值的明細屬於日上三更批次系統,點擊跳轉到 /sanko
+                          清單裡該筆的位置;其餘(單筆明細/場次)維持跳轉 /sessions。 */}
                       {items.map((it) =>
-                        it.所屬Session ? (
+                        it.更次 ? (
+                          <Link
+                            key={it.id}
+                            href={`/sanko?detailId=${it.id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-[10px] leading-tight truncate rounded bg-zinc-100 dark:bg-zinc-800 px-1 hover:bg-zinc-200 dark:hover:bg-zinc-700 underline decoration-dotted"
+                          >
+                            {it.標題}
+                          </Link>
+                        ) : it.所屬Session ? (
                           <Link
                             key={it.id}
                             href={`/sessions?sessionId=${it.所屬Session}`}

@@ -12,7 +12,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useDojo } from "@/lib/dojo/store";
-import { SPACES, LIGHT_NEN, type NenKey } from "@/lib/dojo/constants";
+import { SPACES, GUANGXING, type GuangxingKey } from "@/lib/dojo/constants";
 import EntryCard from "./components/EntryCard";
 
 type TodayTask = {
@@ -24,15 +24,15 @@ type TodayTask = {
   當場主題?: string;
 };
 
-function NenTodayStrip() {
+function GuangxingTodayStrip() {
   const { entries } = useDojo();
-  const counts: Partial<Record<NenKey, number>> = {};
+  const counts: Partial<Record<GuangxingKey, number>> = {};
   for (const e of entries) {
-    if (e.nen) counts[e.nen] = (counts[e.nen] ?? 0) + 1;
+    if (e.guangxing) counts[e.guangxing] = (counts[e.guangxing] ?? 0) + 1;
   }
   return (
     <>
-      {(Object.entries(LIGHT_NEN) as [NenKey, (typeof LIGHT_NEN)[NenKey]][]).map(([k, v]) => (
+      {(Object.entries(GUANGXING) as [GuangxingKey, (typeof GUANGXING)[GuangxingKey]][]).map(([k, v]) => (
         <span
           key={k}
           className="tag"
@@ -92,7 +92,7 @@ export default function HomePage() {
         <h2>今天的你,想去哪裡?</h2>
         <p>這裡不顯示 KPI、逾期與完成率;只留下可接續的事與回家的路。</p>
         <div style={{ marginTop: 10 }}>
-          <NenTodayStrip />
+          <GuangxingTodayStrip />
         </div>
       </div>
 

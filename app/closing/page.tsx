@@ -10,9 +10,20 @@
 // v1.3 §3.5.1:測頻只在收光復盤階段做,不在紀錄當下做——逐筆列出今天的片刻,
 // 各自可用滑桿或數字輸入標記,可清除;保留單筆的數值與霍金斯狀態標籤,不計算
 // 今日平均、不畫任何長條或進度條。
+//
+// 修正委派書 v1.0 四:新增強度(1–10),與頻率並列、規則相同——各自獨立可
+// 清除,清除其中一個不影響另一個;顯示格式集中在 formatFreqIntensityLabel()
+// (兩者皆有:"500・愛 ・ 強度 7";只有一項就只顯示那一項),不在這裡另外拼字串。
 import { useDojo } from "@/lib/dojo/store";
-import { SPACES, LIGHT_NEN } from "@/lib/dojo/constants";
-import { resolveHawkinsLevel, HAWKINS_MIN, HAWKINS_MAX } from "@/lib/dojo/hawkins";
+import { SPACES, GUANGXING, GUANGFA } from "@/lib/dojo/constants";
+import {
+  resolveHawkinsLevel,
+  formatFreqIntensityLabel,
+  HAWKINS_MIN,
+  HAWKINS_MAX,
+  INTENSITY_MIN,
+  INTENSITY_MAX,
+} from "@/lib/dojo/hawkins";
 import ExistingFeatureLinks from "../components/ExistingFeatureLinks";
 
 const CHOICES: { label: string; note: string }[] = [
@@ -22,9 +33,10 @@ const CHOICES: { label: string; note: string }[] = [
 ];
 
 const DEFAULT_FREQ = 500;
+const DEFAULT_INTENSITY = 5;
 
 export default function ClosingPage() {
-  const { entries, setEntryFreq } = useDojo();
+  const { entries, setEntryFreq, setEntryIntensity } = useDojo();
   const todayEntries = entries.filter((e) => e.date === "今天" || e.date === "剛剛");
 
   return (
@@ -43,24 +55,37 @@ export default function ClosingPage() {
       {todayEntries.length === 0 && <div className="empty">今天還沒有片刻可以復盤。</div>}
       {todayEntries.map((e) => {
         const level = e.freq != null ? resolveHawkinsLevel(e.freq) : null;
+        const combinedLabel = formatFreqIntensityLabel(e.freq, e.intensity);
         return (
           <div key={e.id} className={`item ${SPACES[e.space]?.[1] ?? "dw"}`}>
             <span className="status">
               <span className="dot" />
               {SPACES[e.space]?.[0]} · {e.kind}
             </span>
-            {e.nen && (
+            {e.guangxing && (
               <span className="tag" style={{ borderColor: "var(--gold)", color: "var(--gold)" }}>
-                {LIGHT_NEN[e.nen][0]}
+                {GUANGXING[e.guangxing][0]}
+              </span>
+            )}
+            {e.guangfa && (
+              <span className="tag" style={{ borderColor: "var(--gold)", color: "var(--gold)" }}>
+                {GUANGFA[e.guangfa][0]}
               </span>
             )}
             <b>{e.title}</b>
-            {level ? (
+            {combinedLabel && (
+              <span
+                className="tag"
+                style={{ borderColor: level?.color ?? "var(--gold)", color: level?.color ?? "var(--gold)", marginTop: 6 }}
+              >
+                {combinedLabel}
+              </span>
+            )}
+
+            <small style={{ display: "block", marginTop: 8 }}>頻率(0–1000)</small>
+            {e.freq != null ? (
               <>
-                <span className="tag" style={{ borderColor: level.color, color: level.color, marginTop: 6 }}>
-                  {e.freq}・{level.label}
-                </span>
-                <div className="two" style={{ marginTop: 8, alignItems: "center" }}>
+                <div className="two" style={{ marginTop: 4, alignItems: "center" }}>
                   <input
                     type="range"
                     min={HAWKINS_MIN}
@@ -83,12 +108,48 @@ export default function ClosingPage() {
                   />
                 </div>
                 <button className="danger" style={{ marginTop: 6 }} onClick={() => setEntryFreq(e.id, null)}>
-                  清除標記
+                  清除頻率
                 </button>
               </>
             ) : (
               <button style={{ marginTop: 6 }} onClick={() => setEntryFreq(e.id, DEFAULT_FREQ)}>
-                標記這一刻
+                標記頻率
+              </button>
+            )}
+
+            <small style={{ display: "block", marginTop: 10 }}>強度(1–10)</small>
+            {e.intensity != null ? (
+              <>
+                <div className="two" style={{ marginTop: 4, alignItems: "center" }}>
+                  <input
+                    type="range"
+                    min={INTENSITY_MIN}
+                    max={INTENSITY_MAX}
+                    step={1}
+                    value={e.intensity}
+                    onChange={(ev) => setEntryIntensity(e.id, Number(ev.target.value))}
+                  />
+                  <input
+                    className="field"
+                    style={{ margin: 0 }}
+                    type="number"
+                    min={INTENSITY_MIN}
+                    max={INTENSITY_MAX}
+                    value={e.intensity}
+                    onChange={(ev) => {
+                      const n = Number(ev.target.value);
+                      if (Number.isFinite(n))
+                        setEntryIntensity(e.id, Math.min(INTENSITY_MAX, Math.max(INTENSITY_MIN, n)));
+                    }}
+                  />
+                </div>
+                <button className="danger" style={{ marginTop: 6 }} onClick={() => setEntryIntensity(e.id, null)}>
+                  清除強度
+                </button>
+              </>
+            ) : (
+              <button style={{ marginTop: 6 }} onClick={() => setEntryIntensity(e.id, DEFAULT_INTENSITY)}>
+                標記強度
               </button>
             )}
           </div>

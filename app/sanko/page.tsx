@@ -21,7 +21,8 @@
 // 產生指令→複製→貼回→標記完成),沿用既有邏輯,只是入口從清單換成日期卡。
 // 拍照辨牌(委派書 §4.2 引用的舊規格)確認不接——實際上線的生成流程本來就
 // 沒有這步,擁有者已確認不要臨時加。
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { SANKO_METHOD_LIST, type SankoMethodKey } from "@/lib/dojo/methods";
 import { useBackableState } from "@/lib/dojo/backstack";
 import { normalizeDetailStatus } from "@/lib/notion/schema";
@@ -126,6 +127,17 @@ const EMPTY_DRAFT: SankoDraft = {
 };
 
 export default function SankoPage() {
+  return (
+    <Suspense fallback={<section className="screen sanko"><p className="meta">載入中…</p></section>}>
+      <SankoPageInner />
+    </Suspense>
+  );
+}
+
+function SankoPageInner() {
+  const searchParams = useSearchParams();
+  const targetDetailId = searchParams.get("detailId");
+  const rowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [pending, setPending] = useState<PendingDetail[]>([]);
   const [loadingPending, setLoadingPending] = useState(false);
   const [selected, setSelected] = useState<PendingDetail | null>(null);
@@ -149,6 +161,7 @@ export default function SankoPage() {
   const [batchDays, setBatchDays] = useState(14);
   const [creatingBatch, setCreatingBatch] = useState(false);
   const [batchMsg, setBatchMsg] = useState<string | null>(null);
+  const [batchMsgIsWarning, setBatchMsgIsWarning] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -211,11 +224,31 @@ export default function SankoPage() {
     load();
   }, []);
 
+  // 修正委派書 v1.0 二:總覽台行事曆的標籤點擊要能跳轉到這裡對應那一筆的位置
+  // (?detailId=xxx)。highlightId 純粹是「目標 id 是否已經在載入完成的
+  // batchDetails 裡」的衍生值,用 useMemo 算,不要放進 state——scrollIntoView
+  // 才是真正需要 effect 的「操作外部 DOM」動作,對齊 /sessions 既有的
+  // highlightId + scrollIntoView 作法。
+  const highlightId = useMemo(
+    () => (targetDetailId && batchDetails.some((d) => d.id === targetDetailId) ? targetDetailId : null),
+    [targetDetailId, batchDetails]
+  );
+
+  useEffect(() => {
+    if (!highlightId) return;
+    rowRefs.current.get(highlightId)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [highlightId]);
+
   const batchGroups = useMemo(() => groupIntoBatches(batchDetails), [batchDetails]);
 
+  // 訊息一律依伺服器回報的「實際成功寫入」筆數與日期範圍組成,不是直接照抄
+  // 送出前的預覽參數(batchStart/batchDays)——若有任何一筆失敗,實際範圍/
+  // 筆數就會跟預覽不同,必須讓這個落差看得見,不能顯示成「已建立整批」蓋過去
+  // (修正委派書 v1.0 一之 4:預覽必須與寫入結果一致)。
   async function createBatch() {
     setCreatingBatch(true);
     setBatchMsg(null);
+    setBatchMsgIsWarning(false);
     try {
       const res = await fetch("/api/sanko/batches", {
         method: "POST",
@@ -224,10 +257,22 @@ export default function SankoPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "建立失敗");
-      const failMsg = data.failed?.length ? `,${data.failed.length} 筆失敗` : "";
-      setBatchMsg(`已建立 ${fmtMD(batchStart)}–${fmtMD(addDaysISO(batchStart, batchDays - 1))},共 ${batchDays * 3} 篇${failMsg}`);
+      const expectedCount: number = data.expectedCount ?? batchDays * 3;
+      const actualCount: number = data.actualCount ?? 0;
+      const shortfall = expectedCount - actualCount;
+      if (shortfall > 0) {
+        const rangeText =
+          data.actualStart && data.actualEnd ? `${fmtMD(data.actualStart)}–${fmtMD(data.actualEnd)}` : "無";
+        setBatchMsgIsWarning(true);
+        setBatchMsg(
+          `只成功建立 ${actualCount} / ${expectedCount} 篇(實際範圍 ${rangeText}),${shortfall} 篇失敗,請重新整理確認後再嘗試補建。`
+        );
+      } else {
+        setBatchMsg(`已建立 ${fmtMD(batchStart)}–${fmtMD(addDaysISO(batchStart, batchDays - 1))},共 ${actualCount} 篇`);
+      }
       await refreshBatches();
     } catch (e) {
+      setBatchMsgIsWarning(true);
       setBatchMsg(`錯誤:${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setCreatingBatch(false);
@@ -438,7 +483,9 @@ export default function SankoPage() {
         <p className="lead">語氣指引動態讀取現行版 · 選完直接複製</p>
 
         {finishMsg && <div className="note" style={{ color: "var(--green)" }}>{finishMsg}</div>}
-        {batchMsg && <div className="note">{batchMsg}</div>}
+        {batchMsg && (
+          <div className={batchMsgIsWarning ? "warn" : "note"}>{batchMsg}</div>
+        )}
 
         <div className="step">
           <h2>建立新的一批</h2>
@@ -573,7 +620,16 @@ export default function SankoPage() {
                       }
 
                       return (
-                        <div key={u} className={"slot" + (finished ? " done" : "")}>
+                        <div
+                          key={u}
+                          ref={(el) => {
+                            if (!detail) return;
+                            if (el) rowRefs.current.set(detail.id, el);
+                            else rowRefs.current.delete(detail.id);
+                          }}
+                          className={"slot" + (finished ? " done" : "")}
+                          style={detail && highlightId === detail.id ? { boxShadow: "0 0 0 2px var(--gold)" } : undefined}
+                        >
                           {!detail ? (
                             <>
                               <span className="bar" style={{ background: info.colorVar }} />

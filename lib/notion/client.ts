@@ -40,6 +40,12 @@ function sleep(ms: number) {
 }
 
 // 指數退避重試:最多 3 次,3 次仍失敗則丟出錯誤讓呼叫端記錄「哪幾筆沒寫入」。
+// 429/5xx(Notion 端限流或暫時性錯誤)重試;無 status 的錯誤(網路中斷、連線
+// 逾時等)本質上也是暫時性的,同樣視為可重試——只有 Notion 明確回傳的 4xx
+// (參數錯誤、權限不足等)才是重試也不會成功的錯誤,才不重試。批次寫入
+// (如日上三更批次建立)一次要連續送出數十筆請求,若中途有一兩筆因短暫網路
+// 抖動失敗又沒被重試,會造成「這批只成功一半」的部分寫入,卻只看得到
+// Notion 裡缺了幾筆、看不出原因——擴大重試範圍是為了降低這種情況發生的機率。
 export async function withNotionRateLimit<T>(fn: () => Promise<T>): Promise<T> {
   await throttledSlot();
   const delays = [500, 1500, 4000];
@@ -50,7 +56,7 @@ export async function withNotionRateLimit<T>(fn: () => Promise<T>): Promise<T> {
     } catch (err) {
       lastErr = err;
       const status = (err as { status?: number })?.status;
-      const retryable = status === 429 || (status !== undefined && status >= 500);
+      const retryable = status === undefined || status === 429 || status >= 500;
       if (!retryable || attempt === delays.length) break;
       await sleep(delays[attempt]);
     }

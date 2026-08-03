@@ -39,13 +39,18 @@ export async function GET(req: NextRequest) {
     sessionMap.set(id, await getSession(id));
   }
 
+  // 修正委派書 v1.0 二:行事曆標籤不得顯示明細編號(如 S-20260713-001-13)。
+  // 日上三更批次建立的明細有「更次」值(晨光/日光/夜光),直接顯示更次即可——
+  // 日期已經是格子本身,標籤只需要更次。非批次系統的舊式單筆明細沒有更次值,
+  // 退而用 Session 的項目用途頂替,一樣避開裸編號。
   const calendarFromDetails = details.map((d) => {
     const session = d.所屬Session ? sessionMap.get(d.所屬Session) : undefined;
     return {
       type: "明細" as const,
       id: d.id,
       日期: d.對應日期,
-      標題: d.明細編號,
+      標題: d.更次 ?? session?.項目用途 ?? "明細",
+      更次: d.更次,
       項目用途: session?.項目用途 ?? null,
       狀態: session?.狀態 ?? null,
       是實驗: session?.項目用途 === "實驗",
