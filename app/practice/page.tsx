@@ -7,6 +7,13 @@
 // 修行紀錄(6 分頁);「心」點入後在下面再多一排 知/情/意 子分頁(v1.1 起就有
 // 這個概念,這次正式做成 UI)。原本已作廢的舊版單層五功法系統,拆成光行五與
 // 光法五兩個獨立分頁,各自選填、不計分、不解鎖、不累積等級。
+//
+// 追加修正(2026-08-03,擁有者指示):六個子項目(身/心-知/心-情/心-意/靈/
+// 光行/光法)的內容卡片上各加一顆「在此計時」,直接呼叫 useDojo() 的
+// startTimerWith() 一次帶入完整的 space/title/kind(光行/光法分頁另外帶入
+// 目前選中的項目),不需要使用者到 /timer 再重新選一次自己剛剛所在的位置。
+// 身/心的知情意/靈沒有既定的光行／光法對應關係(那是兩套獨立的選填標籤,不
+// 是身心靈的子分類),維持「不特別標記」,不自行發明對應。
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useDojo } from "@/lib/dojo/store";
@@ -49,7 +56,14 @@ export default function PracticePage() {
 }
 
 function BodyTab() {
-  const { openQuickAdd } = useDojo();
+  const router = useRouter();
+  const { openQuickAdd, startTimerWith } = useDojo();
+  // 身沒有明確對應的光行／光法項目(兩者是獨立的選填標籤,不是身心靈的子分類),
+  // 維持不特別標記,不自行發明對應關係。
+  function startHere() {
+    startTimerWith({ space: "practice", title: "身", kind: "身" });
+    router.push("/timer");
+  }
   return (
     <>
       <div className="card">
@@ -72,6 +86,9 @@ function BodyTab() {
       <button className="primary" onClick={() => openQuickAdd({ presetSpace: "practice", presetKind: "身" })}>
         留下身體紀錄
       </button>
+      <button className="ghost" onClick={startHere}>
+        在此計時
+      </button>
     </>
   );
 }
@@ -85,8 +102,14 @@ const MIND_SUB_DESC: Record<MindSub, string> = {
 };
 
 function MindTab() {
-  const { openQuickAdd } = useDojo();
+  const router = useRouter();
+  const { openQuickAdd, startTimerWith } = useDojo();
   const [sub, setSub] = useState<MindSub>("知");
+  // 知/情/意沒有明確對應的光行／光法項目,維持不特別標記(理由同身)。
+  function startHere() {
+    startTimerWith({ space: "practice", title: `心・${sub}`, kind: `心／${sub}` });
+    router.push("/timer");
+  }
   return (
     <>
       <div className="row">
@@ -104,12 +127,21 @@ function MindTab() {
       <button className="primary" onClick={() => openQuickAdd({ presetSpace: "practice", presetKind: `心／${sub}` })}>
         留下{sub}的紀錄
       </button>
+      <button className="ghost" onClick={startHere}>
+        在此計時
+      </button>
     </>
   );
 }
 
 function SpiritTab() {
-  const { openQuickAdd } = useDojo();
+  const router = useRouter();
+  const { openQuickAdd, startTimerWith } = useDojo();
+  // 靈沒有明確對應的光行／光法項目,維持不特別標記(理由同身)。
+  function startHere() {
+    startTimerWith({ space: "practice", title: "靈", kind: "靈" });
+    router.push("/timer");
+  }
   return (
     <>
       <div className="card">
@@ -120,18 +152,28 @@ function SpiritTab() {
       <button className="primary" onClick={() => openQuickAdd({ presetSpace: "practice", presetKind: "靈" })}>
         留下靈修紀錄
       </button>
+      <button className="ghost" onClick={startHere}>
+        在此計時
+      </button>
     </>
   );
 }
 
 function GuangxingTab() {
   const router = useRouter();
-  const { startTimerWithGuangxing } = useDojo();
+  const { startTimerWith } = useDojo();
   const [selected, setSelected] = useState<GuangxingKey>("ning");
   const v = GUANGXING[selected];
 
-  function startWithGuangxing(k: GuangxingKey) {
-    startTimerWithGuangxing(k);
+  // 光行分頁選中的項目就是明確對應,直接帶入 guangxing——跟身/心/靈那幾個
+  // 分頁不同,那幾個沒有既定的光行／光法對應關係,不能套用同一套邏輯。
+  function startHere() {
+    startTimerWith({
+      space: "practice",
+      title: `${v[0]}:${v[2].split("、")[0]}`,
+      kind: `光行／${v[0]}`,
+      guangxing: selected,
+    });
     router.push("/timer");
   }
 
@@ -153,8 +195,8 @@ function GuangxingTab() {
         <span className="label">{v[0]}</span>
         <b>{v[1]}</b>
         <small>真實對應:{v[2]}</small>
-        <button className="primary" onClick={() => startWithGuangxing(selected)}>
-          以「{v[0]}」開始這段修行
+        <button className="primary" onClick={startHere}>
+          在此計時
         </button>
       </div>
     </>
@@ -163,12 +205,17 @@ function GuangxingTab() {
 
 function GuangfaTab() {
   const router = useRouter();
-  const { startTimerWithGuangfa } = useDojo();
+  const { startTimerWith } = useDojo();
   const [selected, setSelected] = useState<GuangfaKey>("ju");
   const v = GUANGFA[selected];
 
-  function startWithGuangfa(k: GuangfaKey) {
-    startTimerWithGuangfa(k);
+  function startHere() {
+    startTimerWith({
+      space: "practice",
+      title: `${v[0]}:${v[2].split("、")[0]}`,
+      kind: `光法／${v[0]}`,
+      guangfa: selected,
+    });
     router.push("/timer");
   }
 
@@ -190,8 +237,8 @@ function GuangfaTab() {
         <span className="label">{v[0]}</span>
         <b>{v[1]}</b>
         <small>真實對應:{v[2]}</small>
-        <button className="primary" onClick={() => startWithGuangfa(selected)}>
-          以「{v[0]}」開始這段修行
+        <button className="primary" onClick={startHere}>
+          在此計時
         </button>
       </div>
     </>
