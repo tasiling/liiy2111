@@ -24,6 +24,14 @@ type TodayTask = {
   當場主題?: string;
 };
 
+// 居所「回到哪裡」(收光三選項與居所接續規格 v1.0 §二):兩個來源依序取用,
+// 最多 3 張——不依賴使用者一定要做過收光(§0.3),沒收光的日子這裡照樣能有
+// 內容(來自 Source B1)。零張時這個區塊要整個不顯示,不能出現空狀態文字,
+// 所以不用既有的 loadingTasks/tasksError 那套(那套本身就會在零筆時顯示文字)。
+type ContinuationCard =
+  | { source: "carry"; text: string }
+  | { source: "b1"; text: string; detailId: string; sessionId: string | null };
+
 function GuangxingTodayStrip() {
   const { entries } = useDojo();
   const counts: Partial<Record<GuangxingKey, number>> = {};
@@ -53,6 +61,22 @@ export default function HomePage() {
   const [todayTasks, setTodayTasks] = useState<TodayTask[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [tasksError, setTasksError] = useState<string | null>(null);
+  const [continuationCards, setContinuationCards] = useState<ContinuationCard[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/closing/continuations")
+      .then((r) => r.json())
+      .then((json) => {
+        if (!cancelled) setContinuationCards(json.cards ?? []);
+      })
+      .catch(() => {
+        // 靜默失敗:這個區塊本來就是「有才顯示」,查詢失敗等同沒有卡片,不彈錯誤。
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -119,6 +143,31 @@ export default function HomePage() {
           <small>{t.項目用途 || t.當場主題 || ""}</small>
         </button>
       ))}
+
+      {continuationCards.length > 0 && (
+        <>
+          <h3>回到哪裡</h3>
+          {continuationCards.map((c, i) =>
+            c.source === "b1" ? (
+              <button key={i} className="item dw" onClick={() => router.push(`/sanko?detailId=${c.detailId}`)}>
+                <span className="status">
+                  <span className="dot" />
+                  日上三更
+                </span>
+                <b>{c.text}</b>
+              </button>
+            ) : (
+              <div key={i} className="item cl">
+                <span className="status">
+                  <span className="dot" />
+                  帶回明天
+                </span>
+                <b>{c.text}</b>
+              </div>
+            )
+          )}
+        </>
+      )}
 
       <h3>接續中的事</h3>
       {recentEntries.length === 0 && <div className="empty">目前沒有可公開顯示的接續事項。</div>}

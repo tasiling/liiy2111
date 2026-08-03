@@ -990,6 +990,29 @@
   z-index: 9;
 }
 
+/* 收光完成的低刺激動效(收光三選項與居所接續規格 v1.0 §四:800–1200ms,不是
+   彈出成功訊息要求使用者確認,是安靜淡入淡出,期間背景已經在準備跳轉居所)。 */
+.dojo .settle {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(246, 241, 230, 0.94);
+  color: var(--ink);
+  font: 600 20px "Noto Serif TC", serif;
+  letter-spacing: 0.08em;
+  animation: dojo-settle-fade 1000ms ease-in-out forwards;
+  pointer-events: none;
+}
+@keyframes dojo-settle-fade {
+  0% { opacity: 0; }
+  20% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
 @media (min-width: 501px) {
   .dojo {
     padding: 20px;

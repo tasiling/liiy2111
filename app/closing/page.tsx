@@ -14,6 +14,15 @@
 // 修正委派書 v1.0 四:新增強度(1–10),與頻率並列、規則相同——各自獨立可
 // 清除,清除其中一個不影響另一個;顯示格式集中在 formatFreqIntensityLabel()
 // (兩者皆有:"500・愛 ・ 強度 7";只有一項就只顯示那一項),不在這裡另外拼字串。
+//
+// 《收光三選項與居所接續 — 資料邏輯規格 v1.0》(2026-08-03,擁有者裁決零新增
+// 欄位,沿用 DojoEntry 語意寫進 DB-14):三個選項是「今天整體怎麼結束」的一次性
+// 動作,不改動任何一筆痕跡的狀態(§0.1)——這裡呼叫 POST /api/closing,不碰
+// useDojo() 的 entries。「暫且放下」「直接收光」送出後行為完全相同,只有
+// choice 值不同;「帶回明天」多一步可選填一句話(可略過)。三者送出成功後都
+// 播放低刺激收光動效(800–1200ms)再回居所(§四)。
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useDojo } from "@/lib/dojo/store";
 import { SPACES, GUANGXING, GUANGFA } from "@/lib/dojo/constants";
 import {
@@ -26,18 +35,52 @@ import {
 } from "@/lib/dojo/hawkins";
 import ExistingFeatureLinks from "../components/ExistingFeatureLinks";
 
-const CHOICES: { label: string; note: string }[] = [
-  { label: "帶回明天", note: "建立一個溫和的接續入口。" },
-  { label: "暫且放下", note: "不建立待辦,現在先休息。" },
-  { label: "直接收光", note: "今天就在此結束,不留任何提示。" },
+type ClosingChoice = "carry" | "pause" | "close";
+
+const CHOICES: { choice: ClosingChoice; label: string; note: string }[] = [
+  { choice: "carry", label: "帶回明天", note: "建立一個溫和的接續入口。" },
+  { choice: "pause", label: "暫且放下", note: "不建立待辦,現在先休息。" },
+  { choice: "close", label: "直接收光", note: "今天就在此結束,不留任何提示。" },
 ];
 
 const DEFAULT_FREQ = 500;
 const DEFAULT_INTENSITY = 5;
 
 export default function ClosingPage() {
+  const router = useRouter();
   const { entries, setEntryFreq, setEntryIntensity } = useDojo();
   const todayEntries = entries.filter((e) => e.date === "今天" || e.date === "剛剛");
+
+  // 「帶回明天」是唯一有額外步驟的選項:點下去先展開一句話輸入框(可留空),
+  // 按確定才真的送出;另外兩個選項點下去就直接送出,不需要中間狀態。
+  const [carryStep, setCarryStep] = useState(false);
+  const [carryNote, setCarryNote] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [settled, setSettled] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submitChoice(choice: ClosingChoice, note?: string) {
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/closing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ choice, note }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "收光失敗,請重試。");
+      }
+      setSettled(true);
+      // 低刺激收光動效(800–1200ms)後回居所——不是換頁式的成功訊息,是安靜地淡出。
+      setTimeout(() => router.push("/"), 1000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <section className="screen">
@@ -157,16 +200,45 @@ export default function ClosingPage() {
       })}
 
       <h3>今天怎麼處置</h3>
-      {CHOICES.map((c) => (
-        <button
-          key={c.label}
-          className="item cl"
-          onClick={() => alert(`已選擇:${c.label}(此為工程測試版,尚未接正式流程)`)}
-        >
-          <b>{c.label}</b>
-          <small>{c.note}</small>
-        </button>
-      ))}
+      {error && <div className="warn">{error}</div>}
+      {!carryStep &&
+        CHOICES.map((c) => (
+          <button
+            key={c.choice}
+            className="item cl"
+            disabled={submitting}
+            onClick={() => (c.choice === "carry" ? setCarryStep(true) : submitChoice(c.choice))}
+          >
+            <b>{c.label}</b>
+            <small>{c.note}</small>
+          </button>
+        ))}
+      {carryStep && (
+        <div className="item cl">
+          <b>帶回明天</b>
+          <small>可以寫一句話,亦可略過。</small>
+          <textarea
+            className="field"
+            style={{ marginTop: 8 }}
+            value={carryNote}
+            onChange={(e) => setCarryNote(e.target.value)}
+            placeholder="想帶到明天的一句話(選填)"
+          />
+          <div className="two" style={{ marginTop: 8 }}>
+            <button onClick={() => { setCarryStep(false); setCarryNote(""); }} disabled={submitting}>
+              取消
+            </button>
+            <button className="primary" onClick={() => submitChoice("carry", carryNote)} disabled={submitting}>
+              {submitting ? "送出中…" : "帶回明天"}
+            </button>
+          </div>
+        </div>
+      )}
+      {settled && (
+        <div className="settle" role="status">
+          已收光
+        </div>
+      )}
       <div className="note">
         測試重點:三個處置選項是否足夠;復盤測頻是否讓人有壓力(不測也完全合法,不應該有任何提示要求一定要測)。
       </div>
