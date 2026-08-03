@@ -1,5 +1,5 @@
 import { notion, withNotionRateLimit } from "./client";
-import { DATA_SOURCES, PLURK_TEMPLATE_TITLE_PREFIX, PLURK_DRAFT_TITLE_PREFIX } from "./schema";
+import { DATA_SOURCES, PLURK_TEMPLATE_TITLE_PREFIX, PLURK_DRAFT_TITLE_PREFIX, type SankoUpdateType } from "./schema";
 import {
   readTitle,
   readRichText,
@@ -119,6 +119,9 @@ export function mapDetail(p: NotionPage) {
     // 多篇,改用這裡——Session 表頭的產出連結留給單筆模式或不使用。
     草稿: readRichText(p, "草稿"),
     產出連結: readUrl(p, "產出連結"),
+    // 日上三更・批次建立(2026-08-03 擁有者於 Notion 新增):只有這次批次流程
+    // 建立的明細會有值,其餘明細此欄留空(不是缺陷,代表不屬於這個批次系統)。
+    更次: readSelect(p, "更次") as SankoUpdateType | null,
   };
 }
 
@@ -157,6 +160,17 @@ export async function listPendingDetails() {
       { property: "明細狀態", select: { equals: "待審核" } },
       { property: "明細狀態", select: { is_empty: true } },
     ],
+  });
+  return pages.map(mapDetail).sort((a, b) => (a.對應日期 ?? "").localeCompare(b.對應日期 ?? ""));
+}
+
+// 日上三更・批次建立與產出清單:抓所有「更次」有值的明細(不限狀態,已產出/
+// 已交付也要,才能算出每天 N/3 的完成度),依所屬 Session 分組還原成一批一批,
+// 前端再依對應日期展開成日期卡。
+export async function listSankoBatchDetails() {
+  const pages = await queryAll(DATA_SOURCES.DB04_抽牌明細, {
+    property: "更次",
+    select: { is_not_empty: true },
   });
   return pages.map(mapDetail).sort((a, b) => (a.對應日期 ?? "").localeCompare(b.對應日期 ?? ""));
 }

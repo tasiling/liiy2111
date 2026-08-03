@@ -10,6 +10,7 @@ import {
   type SessionStatus,
   type DetailStatus,
   type Feedback對象類型,
+  type SankoUpdateType,
 } from "./schema";
 import {
   titleProp,
@@ -102,6 +103,32 @@ export async function createDetailWithTitle(params: {
   return { id: page.id, 明細編號: params.明細編號 };
 }
 
+// 日上三更・批次建立(委派書 v1.0,方案 B):比照 createDetail,多寫入「更次」
+// 欄。維持「一個 Session 涵蓋整個日期範圍」的既有資料形狀——序號 1..N 正常
+// 遞增,不因為要配合更次識別而拆成一天一個 Session。
+export async function createSankoBatchDetail(params: {
+  sessionId: string;
+  sessionCode: string;
+  對應日期: string;
+  序: number;
+  更次: SankoUpdateType;
+}) {
+  const 明細編號 = `${params.sessionCode}-${String(params.序).padStart(2, "0")}`;
+  const page = await withNotionRateLimit(() =>
+    notion().pages.create({
+      parent: { type: "data_source_id", data_source_id: DATA_SOURCES.DB04_抽牌明細 },
+      properties: {
+        明細編號: titleProp(明細編號),
+        對應日期: dateProp(params.對應日期),
+        "所屬 Session": relationProp([params.sessionId]),
+        明細狀態: selectProp(DETAIL_STATUS_DEFAULT),
+        更次: selectProp(params.更次),
+      },
+    })
+  );
+  return { id: page.id, 明細編號 };
+}
+
 // 抽牌輸入:寫入抽出牌卡(relation)+ 抽出順序(權威順序文字,如 "MP-15, MP-17, MP-09")
 export async function writeDraw(params: {
   detailId: string;
@@ -165,6 +192,16 @@ export async function updateDetailStatus(detailId: string, newStatus: DetailStat
       properties: { 明細狀態: selectProp(newStatus) },
     })
   );
+}
+
+// 日上三更・批次建立(委派書 v1.0 §4.4):日期卡的快速勾選,直接勾選完成→
+// 已產出、取消勾選→待產出。這是刻意允許往回走的唯一例外路徑——目的是「勾選
+// 方塊」的直覺(勾了可以反悔取消),不是正式審核流程的倒退,所以不經過
+// canAdvanceDetailStatus() 的單向限制。只在 待產出/待審核 ⇄ 已產出 之間切換;
+// 已交付是更終局的歷史紀錄,不開放這個入口去動它——呼叫端(quick-toggle API)
+// 需自行擋下已交付的情況,不能無條件呼叫這支函式。
+export async function setDetailQuickDone(detailId: string, done: boolean) {
+  await updateDetailStatus(detailId, done ? "已產出" : "待產出");
 }
 
 // 明細日期編輯/批次平移(擁有者 2026-07-13 追加指示):只允許明細狀態=待產出者變動

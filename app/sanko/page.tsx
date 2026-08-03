@@ -14,9 +14,26 @@
 // 草稿與產出連結(2026-08-01 擁有者於 Notion 新增對應欄位後)一律直接寫 Notion,
 // 不經瀏覽器暫存——App 掛掉時擁有者必須能在 Notion 直接看到草稿並手動接手。
 // 詳見 docs/schema/日上三更指令產生器.md。
-import { useEffect, useState } from "react";
+//
+// 批次建立與產出清單(委派書 v1.0,2026-08-03):比照 sanko-batch-prototype.html
+// 實作,依日期×更次(晨光/日光/夜光)分組呈現,不再讓使用者面對裸的明細編號。
+// 點「產出」進入的就是這份檔案原有的生成流程(選方法→輸入牌→選光站→補充→
+// 產生指令→複製→貼回→標記完成),沿用既有邏輯,只是入口從清單換成日期卡。
+// 拍照辨牌(委派書 §4.2 引用的舊規格)確認不接——實際上線的生成流程本來就
+// 沒有這步,擁有者已確認不要臨時加。
+import { useEffect, useMemo, useState } from "react";
 import { SANKO_METHOD_LIST, type SankoMethodKey } from "@/lib/dojo/methods";
 import { useBackableState } from "@/lib/dojo/backstack";
+
+type SankoUpdateType = "晨光" | "日光" | "夜光";
+const UPDATE_TYPES: SankoUpdateType[] = ["晨光", "日光", "夜光"];
+const UPDATE_INFO: Record<SankoUpdateType, { desc: string; mode: "生成" | "完成"; colorVar: string }> = {
+  晨光: { desc: "直覺入口", mode: "生成", colorVar: "var(--morning)" },
+  日光: { desc: "自我辨識", mode: "生成", colorVar: "var(--day)" },
+  夜光: { desc: "服務理解 · 全圖文", mode: "完成", colorVar: "var(--night)" },
+};
+const BATCH_DAY_OPTIONS = [7, 14, 21, 28];
+const WD = ["日", "一", "二", "三", "四", "五", "六"];
 
 type PendingDetail = {
   id: string;
@@ -27,7 +44,63 @@ type PendingDetail = {
   明細狀態: string | null;
   草稿: string;
   產出連結: string | null;
+  更次: SankoUpdateType | null;
 };
+
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+function addDaysISO(iso: string, n: number): string {
+  const d = new Date(iso + "T00:00:00");
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+function fmtMD(iso: string): string {
+  const d = new Date(iso + "T00:00:00");
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+function fmtWD(iso: string): string {
+  return `週${WD[new Date(iso + "T00:00:00").getDay()]}`;
+}
+
+type BatchGroup = {
+  sessionId: string;
+  start: string;
+  end: string;
+  days: { date: string; slots: Record<SankoUpdateType, PendingDetail | null> }[];
+};
+
+// 依「所屬 Session」還原成一批一批(委派書裁決:一個 Session 涵蓋整個日期範圍,
+// 不是一天一個 Session),再依對應日期展開日期卡、依更次分到三個欄位。
+function groupIntoBatches(details: PendingDetail[]): BatchGroup[] {
+  const bySession = new Map<string, PendingDetail[]>();
+  for (const d of details) {
+    if (!d.所屬Session || !d.對應日期) continue;
+    const list = bySession.get(d.所屬Session) ?? [];
+    list.push(d);
+    bySession.set(d.所屬Session, list);
+  }
+  const groups: BatchGroup[] = [];
+  for (const [sessionId, items] of bySession) {
+    const byDate = new Map<string, Record<SankoUpdateType, PendingDetail | null>>();
+    for (const item of items) {
+      const date = item.對應日期 as string;
+      const slots = byDate.get(date) ?? { 晨光: null, 日光: null, 夜光: null };
+      if (item.更次) slots[item.更次] = item;
+      byDate.set(date, slots);
+    }
+    const dates = [...byDate.keys()].sort();
+    if (!dates.length) continue;
+    groups.push({
+      sessionId,
+      start: dates[0],
+      end: dates[dates.length - 1],
+      days: dates.map((date) => ({ date, slots: byDate.get(date)! })),
+    });
+  }
+  // 新批次(起始日較晚)排前面,對齊原型 unshift 新批次到最前面的呈現順序。
+  return groups.sort((a, b) => b.start.localeCompare(a.start));
+}
 
 type SankoDraft = {
   methodKey: SankoMethodKey | null;
@@ -69,6 +142,14 @@ export default function SankoPage() {
   const [finishMsg, setFinishMsg] = useState<string | null>(null);
   const [finishError, setFinishError] = useState<string | null>(null);
 
+  const [batchDetails, setBatchDetails] = useState<PendingDetail[]>([]);
+  const [loadingBatches, setLoadingBatches] = useState(false);
+  const [batchStart, setBatchStart] = useState(todayISO());
+  const [batchDays, setBatchDays] = useState(14);
+  const [creatingBatch, setCreatingBatch] = useState(false);
+  const [batchMsg, setBatchMsg] = useState<string | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+
   // 點一筆進入詳情是頁面內的「drill-down」,不是換頁(擁有者指示:返回手勢
   // 要能一步步退回,單筆詳情 → 來源清單):打開時推一筆瀏覽器歷史,返回時
   // 自動收合回清單,不會直接跳出 /sanko。
@@ -85,15 +166,70 @@ export default function SankoPage() {
     }
   }
 
+  async function refreshBatches() {
+    setLoadingBatches(true);
+    try {
+      const r = await fetch("/api/sanko/batches");
+      const d = await r.json();
+      setBatchDetails(d.details ?? []);
+    } finally {
+      setLoadingBatches(false);
+    }
+  }
+
   useEffect(() => {
     async function load() {
-      await refreshPending();
+      await Promise.all([refreshPending(), refreshBatches()]);
       const r = await fetch("/api/sanko/stations");
       const d = await r.json();
       setStations(d.stations ?? []);
     }
     load();
   }, []);
+
+  const batchGroups = useMemo(() => groupIntoBatches(batchDetails), [batchDetails]);
+
+  async function createBatch() {
+    setCreatingBatch(true);
+    setBatchMsg(null);
+    try {
+      const res = await fetch("/api/sanko/batches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ startDate: batchStart, days: batchDays }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "建立失敗");
+      const failMsg = data.failed?.length ? `,${data.failed.length} 筆失敗` : "";
+      setBatchMsg(`已建立 ${fmtMD(batchStart)}–${fmtMD(addDaysISO(batchStart, batchDays - 1))},共 ${batchDays * 3} 篇${failMsg}`);
+      await refreshBatches();
+    } catch (e) {
+      setBatchMsg(`錯誤:${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setCreatingBatch(false);
+    }
+  }
+
+  // 日期卡的快速勾選(委派書 §4.4):直接勾選完成/取消勾選,不進生成流程。
+  // 夜光只有這個入口(不做生成);晨光/日光也可以直接勾選,不強制走流程。
+  async function quickToggle(detail: PendingDetail, done: boolean) {
+    setTogglingId(detail.id);
+    try {
+      const res = await fetch(`/api/sanko/batches/${detail.id}/quick-toggle`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ done }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setBatchMsg(`錯誤:${data.error ?? "更新失敗"}`);
+        return;
+      }
+      await refreshBatches();
+    } finally {
+      setTogglingId(null);
+    }
+  }
 
   // 選定一筆明細:草稿與產出連結直接來自 Notion(pending 清單 API 已回傳),
   // 不再從 localStorage 讀取。方法/牌卡/光站/補充是每次生成指令用的暫時輸入,
@@ -180,6 +316,7 @@ export default function SankoPage() {
       if (!res.ok) throw new Error(data.error ?? "草稿儲存失敗");
       setFinishMsg("草稿已存入 Notion。");
       refreshPending();
+      refreshBatches();
     } catch (e) {
       setFinishError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -207,10 +344,11 @@ export default function SankoPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "標記完成失敗");
-      setFinishMsg(`${selected.明細編號} 已標記完成。`);
+      setFinishMsg(`${selected.對應日期 ?? ""}${selected.更次 ?? ""} 已標記完成。`);
       setSelected(null);
       setDraft(EMPTY_DRAFT);
       refreshPending();
+      refreshBatches();
     } catch (e) {
       setFinishError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -227,6 +365,146 @@ export default function SankoPage() {
         <p className="lead">語氣指引動態讀取現行版 · 選完直接複製</p>
 
         {finishMsg && <div className="note" style={{ color: "var(--green)" }}>{finishMsg}</div>}
+        {batchMsg && <div className="note">{batchMsg}</div>}
+
+        <div className="step">
+          <h2>建立新的一批</h2>
+          <div className="hint">選定起始日與天數,系統會為每一天建立晨光、日光、夜光三篇。</div>
+          <div className="lab">從哪一天開始</div>
+          <input className="field" type="date" value={batchStart} onChange={(e) => setBatchStart(e.target.value)} />
+          <div className="lab">連續幾天</div>
+          <div className="row">
+            {BATCH_DAY_OPTIONS.map((n) => (
+              <button key={n} className={batchDays === n ? "on" : ""} onClick={() => setBatchDays(n)}>
+                {n} 天
+              </button>
+            ))}
+          </div>
+          <div className="preview">
+            <div className="big">
+              {fmtMD(batchStart)} – {fmtMD(addDaysISO(batchStart, batchDays - 1))}
+            </div>
+            <div className="small">
+              {batchDays} 天 × 3 篇(晨光／日光／夜光)＝ 共 {batchDays * 3} 篇
+            </div>
+          </div>
+          <button className="primary" disabled={creatingBatch} onClick={createBatch}>
+            {creatingBatch ? "建立中…" : "建立這一批"}
+          </button>
+        </div>
+
+        <div className="legend">
+          <span>
+            <i style={{ background: "var(--morning)" }} />
+            晨光 · 直覺入口
+          </span>
+          <span>
+            <i style={{ background: "var(--day)" }} />
+            日光 · 自我辨識
+          </span>
+          <span>
+            <i style={{ background: "var(--night)" }} />
+            夜光 · 全圖文
+          </span>
+        </div>
+
+        {loadingBatches && <p className="meta">載入中…</p>}
+        {!loadingBatches && batchGroups.length === 0 && (
+          <div className="empty">還沒有批次。選好起始日與天數,按上面的按鈕建立第一批。</div>
+        )}
+
+        {batchGroups.map((batch) => {
+          const isDone = (d: PendingDetail | null) => Boolean(d && (d.明細狀態 === "已產出" || d.明細狀態 === "已交付"));
+          const totalDone = batch.days.reduce(
+            (sum, day) => sum + UPDATE_TYPES.filter((u) => isDone(day.slots[u])).length,
+            0
+          );
+          const total = batch.days.length * 3;
+          return (
+            <div key={batch.sessionId}>
+              <div className="step" style={{ padding: "13px 15px" }}>
+                <h2>
+                  {fmtMD(batch.start)} – {fmtMD(batch.end)}
+                </h2>
+                <div className="hint" style={{ margin: 0 }}>
+                  已完成 {totalDone} / {total} 篇
+                </div>
+              </div>
+              {batch.days.map((day) => {
+                const doneN = UPDATE_TYPES.filter((u) => isDone(day.slots[u])).length;
+                const isToday = day.date === todayISO();
+                return (
+                  <div key={day.date} className={"daycard" + (isToday ? " today" : "")}>
+                    <div className="dayhead">
+                      <div className="daydate">
+                        {fmtMD(day.date)}
+                        <small>
+                          {fmtWD(day.date)}
+                          {isToday ? " · 今天" : ""}
+                        </small>
+                      </div>
+                      <div className={"daycount" + (doneN === 3 ? " done" : "")}>{doneN} / 3</div>
+                    </div>
+                    {UPDATE_TYPES.map((u) => {
+                      const detail = day.slots[u];
+                      const info = UPDATE_INFO[u];
+                      const done = isDone(detail);
+                      const status = !detail
+                        ? "未建立"
+                        : done
+                          ? "已完成"
+                          : detail.明細狀態 === "待審核"
+                            ? "待審核"
+                            : "待產出";
+                      const toggling = Boolean(detail && togglingId === detail.id);
+                      return (
+                        <div key={u} className={"slot" + (done ? " done" : "")}>
+                          <span className="bar" style={{ background: info.colorVar }} />
+                          <div className="info">
+                            <div className="name">{u}</div>
+                            <div className="meta">
+                              {info.desc} · {status}
+                            </div>
+                          </div>
+                          {!detail ? (
+                            <span className="meta">—</span>
+                          ) : info.mode === "生成" ? (
+                            done ? (
+                              <button className="act" disabled={toggling} onClick={() => quickToggle(detail, false)}>
+                                改回未完成
+                              </button>
+                            ) : (
+                              <>
+                                <button className="act primary" onClick={() => selectDetail(detail)}>
+                                  {status === "待審核" ? "繼續" : "產出"}
+                                </button>
+                                <button className="act check" disabled={toggling} onClick={() => quickToggle(detail, true)}>
+                                  ✓
+                                </button>
+                              </>
+                            )
+                          ) : (
+                            <button
+                              className={"act check" + (done ? " on" : "")}
+                              disabled={toggling}
+                              onClick={() => quickToggle(detail, !done)}
+                            >
+                              ✓
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+
+        <p className="note">
+          晨光與日光走產出流程(選方法→輸入牌→生成草稿);夜光為全圖文,只需在完成後勾選。任何一篇都可以直接勾選標記完成,不一定要走流程。
+        </p>
 
         <div className="step">
           <h2>待產出清單</h2>
@@ -249,6 +527,10 @@ export default function SankoPage() {
 
         {selected && (
           <>
+            <div className="note">
+              正在製作:{selected.對應日期 ?? "未排定日期"}
+              {selected.更次 ? ` · ${selected.更次}` : ""}
+            </div>
             <div className="step">
               <h2>一 · 這篇用哪個方法</h2>
               <div className="hint">選定後自動帶入三段命名、傘段型態與版型規格</div>
