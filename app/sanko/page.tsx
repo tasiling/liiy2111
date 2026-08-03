@@ -34,7 +34,7 @@ const UPDATE_INFO: Record<SankoUpdateType, { desc: string; mode: "生成" | "完
   日光: { desc: "自我辨識", mode: "生成", colorVar: "var(--day)" },
   夜光: { desc: "服務理解 · 全圖文", mode: "完成", colorVar: "var(--night)" },
 };
-const BATCH_DAY_OPTIONS = [7, 14, 21, 28];
+const BATCH_DAY_OPTIONS = [3, 7, 14, 21, 28];
 const WD = ["日", "一", "二", "三", "四", "五", "六"];
 
 type PendingDetail = {
@@ -52,10 +52,19 @@ type PendingDetail = {
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
+// 修正(2026-08-03 擁有者回報批次預覽 off-by-one):原本「new Date(iso+'T00:00:00')
+// 解析成瀏覽器本地時區 → setDate 本地運算 → toISOString() 轉回 UTC 字串」這個
+// 寫法,在 UTC 之外的時區(例如台灣 UTC+8)會在最後一步 toISOString() 把本地
+// 午夜換算回 UTC 時倒退一天,導致預覽的結束日期少算一天。改用 Date.UTC 建構、
+// setUTCDate 運算,全程留在 UTC 定義域,不受瀏覽器本地時區影響——跟後端
+// lib/date.ts 的 addDays()/toISODate() 用的是同一套邏輯,確保預覽跟實際寫入
+// 一致(後端本來就沒有這個 bug,因為 new Date("YYYY-MM-DD") 這種純日期字串
+// 依 ECMAScript 規格一律以 UTC 解析,問題只出在這支給前端顯示用的函式)。
 function addDaysISO(iso: string, n: number): string {
-  const d = new Date(iso + "T00:00:00");
-  d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + n);
+  return dt.toISOString().slice(0, 10);
 }
 function fmtMD(iso: string): string {
   const d = new Date(iso + "T00:00:00");
@@ -508,7 +517,7 @@ function SankoPageInner() {
               {batchDays} 天 × 3 篇(晨光／日光／夜光)＝ 共 {batchDays * 3} 篇
             </div>
           </div>
-          <button className="primary" disabled={creatingBatch} onClick={createBatch}>
+          <button className="primary" style={{ marginTop: 18 }} disabled={creatingBatch} onClick={createBatch}>
             {creatingBatch ? "建立中…" : "建立這一批"}
           </button>
         </div>
