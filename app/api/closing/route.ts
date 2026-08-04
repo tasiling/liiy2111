@@ -6,6 +6,7 @@ import {
   closingRecordTitle,
   encodeClosingContent,
   isValidCarryToDate,
+  type ClosingChoice,
   type ClosingContent,
 } from "@/lib/closing/notionFormat";
 
@@ -13,14 +14,16 @@ import {
 export const dynamic = "force-dynamic";
 
 // 收光三選項(《收光三選項與居所接續》v1.0,行光牌與收光系統・地基實作
-// v2.0/補充裁決01 追加 carryToDate):三個選項都只是「今天整體怎麼結束」的
-// 一次性動作,不改動任何一筆痕跡的狀態(§0.1)。序列化存進 DB-14 既有的
-// 「內容」欄——標題「收光紀錄-YYYYMMDD」一天一筆,若當日已有紀錄則覆蓋
-// (擁有者可能改變主意),不累積多筆。
+// v2.0/補充裁決01 追加 carryToDate,補充裁決03 改版):三個選項都只是「今天
+// 整體怎麼結束」的一次性動作,不改動任何一筆痕跡的狀態(§0.1)。序列化存進
+// DB-14 既有的「內容」欄——標題「收光紀錄-YYYYMMDD」一天一筆,若當日已有
+// 紀錄則覆蓋,不累積多筆。是否要覆蓋、要不要提示使用者,是前端的職責
+// (GET /api/closing/today 給前端判斷用)——這裡維持單純的「呼叫就寫入」,
+// 不在伺服器端額外擋「已存在」的情況。
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const { choice, note, carryToDate } = body as {
-    choice?: "carry" | "pause" | "close";
+    choice?: ClosingChoice;
     note?: string;
     carryToDate?: string;
   };

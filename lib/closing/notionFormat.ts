@@ -17,16 +17,26 @@
 // - DB-14 目前只有一筆用舊格式寫入的真實收光紀錄(沒有這裡任何一個新欄位)
 //   ——decodeClosingContent() 對每個新欄位都做空值 fallback,不假設一定
 //   存在,讀到這筆舊紀錄不會壞掉。
+//
+// 收光改版(2026-08-04,補充裁決03)更新:
+// - 「直接收光」更名「寫下今天」(原名語意是跳過、什麼都不做,與它現在要
+//   承載的日記動作相反)。對應的 API choice 值 close 也已名不符實,改為
+//   journal。舊格式紀錄(title 存的是「直接收光」字面)decode 時原樣讀出,
+//   不需要遷移——只要求「不得因為讀到舊字串而壞掉」,不要求把歷史紀錄的
+//   文字內容也改掉。
+// - 七題日記的內容存放位置尚未裁決(見委派書補充裁決03§四之1),本輪暫不
+//   加對應欄位,等裁決後再擴充 ClosingContent。
 import { CLOSING_TITLE_PREFIX } from "@/lib/notion/schema";
 import { addDays, toISODate } from "@/lib/date";
 import type { TraceLevel, TraceStatus } from "@/lib/dojo/constants";
 
-export type ClosingChoiceTitle = "帶回明天" | "暫且放下" | "直接收光";
+export type ClosingChoice = "carry" | "pause" | "journal";
+export type ClosingChoiceTitle = "帶回明天" | "暫且放下" | "寫下今天";
 
-export const CLOSING_CHOICE_TITLE: Record<"carry" | "pause" | "close", ClosingChoiceTitle> = {
+export const CLOSING_CHOICE_TITLE: Record<ClosingChoice, ClosingChoiceTitle> = {
   carry: "帶回明天",
   pause: "暫且放下",
-  close: "直接收光",
+  journal: "寫下今天",
 };
 
 export type ClosingContent = {
@@ -95,4 +105,14 @@ export function carryDateOptions(todayISO: string): string[] {
 
 export function isValidCarryToDate(candidateISO: string, todayISO: string): boolean {
   return carryDateOptions(todayISO).includes(candidateISO);
+}
+
+const WEEKDAY_LABELS = ["日", "一", "二", "三", "四", "五", "六"];
+
+// 選完之後的回饋文字(補充裁決03§3.2)要引用「帶回」選的那一天,格式跟日期
+// 按鈕列不同(這裡不用「明天/後天」特例,單純日期＋星期幾),獨立成一個小
+// 函式,不跟 app/closing/page.tsx 的按鈕標籤格式混用。
+export function fmtDateWD(iso: string): string {
+  const d = new Date(iso + "T00:00:00");
+  return `${d.getMonth() + 1}/${d.getDate()}(週${WEEKDAY_LABELS[d.getDay()]})`;
 }

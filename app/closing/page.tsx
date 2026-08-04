@@ -29,20 +29,31 @@
 // 《收光三選項與居所接續 — 資料邏輯規格 v1.0》(2026-08-03,擁有者裁決零新增
 // 欄位,沿用 DojoEntry 語意寫進 DB-14):三個選項是「今天整體怎麼結束」的一次性
 // 動作,不改動任何一筆痕跡的狀態(§0.1)——這裡呼叫 POST /api/closing,不碰
-// useDojo() 的 entries。「暫且放下」「直接收光」送出後行為完全相同,只有
-// choice 值不同。三者送出成功後都播放低刺激收光動效(800–1200ms)再回居所。
+// useDojo() 的 entries。三者送出成功後都播放低刺激收光動效(800–1200ms)再
+// 回居所。
 //
 // 行光牌與收光系統・地基實作 v2.0(2026-08-04,補充裁決01)追加:「帶回」不
 // 再固定是明天,改成按鈕列選「明天起七日內」的任一天(全站禁用 <select>、
 // 日曆元件在手機上太慢——照抄委派書原文的理由)。一句話仍然選填,可略過。
-// 選項本身的中文標題維持「帶回明天」不變(委派書表格明訂的三個固定值,沒有
-// 說要隨 carryToDate 變動),UI 上把入口按鈕改標「帶回」以避免跟實際選的
-// 日期矛盾。
-import { useState } from "react";
+//
+// 收光改版(2026-08-04,補充裁決03)追加:
+// - 3.1 同日重複收光前先問:進頁面先查今天是否已有紀錄(GET
+//   /api/closing/today),使用者選了任一選項要送出時,若今天已有紀錄就先跳
+//   確認對話框說明會失去什麼(取代／保留原本的),不得靜默覆蓋。「保留原本
+//   的」不寫入,直接回居所(維持既有那筆有效)。
+// - 3.2 送出成功後,依選項顯示一句描述系統行為的回饋文字,跟收光動效同時
+//   出現——只描述做了什麼,不評價這一天過得如何,不出現鼓勵/關心/暗示產出
+//   的措辭(實際文案由擁有者核定,這裡先給草稿)。
+// - 3.3「直接收光」更名「寫下今天」,choice 值 close 改為語意相符的
+//   journal。
+// - 3.4/3.5(七題日記展開)本輪不做:日記內容要存哪裡還沒裁決(委派書
+//   補充裁決03§四之1 明訂「不要自己選一個做下去」),「寫下今天」目前仍是
+//   立即送出,還沒有展開日記題目——裁決回來後才會接上。
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useDojo } from "@/lib/dojo/store";
 import { SPACES, GUANGXING, GUANGFA, type DojoEntry } from "@/lib/dojo/constants";
-import { carryDateOptions } from "@/lib/closing/notionFormat";
+import { carryDateOptions, fmtDateWD, type ClosingChoice } from "@/lib/closing/notionFormat";
 import {
   resolveHawkinsLevel,
   formatFreqIntensityLabel,
@@ -53,13 +64,23 @@ import {
 } from "@/lib/dojo/hawkins";
 import ExistingFeatureLinks from "../components/ExistingFeatureLinks";
 
-type ClosingChoice = "carry" | "pause" | "close";
-
 const CHOICES: { choice: ClosingChoice; label: string; note: string }[] = [
   { choice: "carry", label: "帶回", note: "選一天,建立一個溫和的接續入口。" },
+  { choice: "journal", label: "寫下今天", note: "留幾句今天的紀錄,幾題都可以。" },
   { choice: "pause", label: "暫且放下", note: "不建立待辦,現在先休息。" },
-  { choice: "close", label: "直接收光", note: "今天就在此結束,不留任何提示。" },
 ];
+
+// 選完之後的回饋文字草稿(3.2):只描述系統剛剛做了什麼,不評價這一天、不
+// 鼓勵、不暗示「有沒有產出」。實際文案由擁有者核定。
+function feedbackText(choice: ClosingChoice, carryToDate: string | null): string {
+  if (choice === "carry") {
+    return carryToDate ? `這件事會在 ${fmtDateWD(carryToDate)}出現在居所。` : "已記下要帶回的這件事。";
+  }
+  if (choice === "journal") return "今天寫下的內容已經存下來了。";
+  return "今天到此結束,不會留下任何待辦。";
+}
+
+type ExistingToday = { title: string; note?: string; carryToDate?: string } | null;
 
 const DEFAULT_FREQ = 500;
 const DEFAULT_INTENSITY = 5;
@@ -91,10 +112,30 @@ export default function ClosingPage() {
   const [settled, setSettled] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // 3.1:進頁面先查今天是否已有收光紀錄,送出時若已存在就先擋下來問——不得
+  // 靜默覆蓋。pendingSubmit 非 null 時代表確認對話框正在顯示,尚未真的送出。
+  const [existingToday, setExistingToday] = useState<ExistingToday>(null);
+  const [pendingSubmit, setPendingSubmit] = useState<{
+    choice: ClosingChoice;
+    extra?: { note?: string; carryToDate?: string };
+  } | null>(null);
+  // 3.2:回饋文字要引用「剛剛送出的那個選擇」,不是目前畫面上的暫存狀態(例如
+  // 送出後 carryStep 可能已經被使用者切換掉),所以送出成功當下另外記一份。
+  const [lastSubmitted, setLastSubmitted] = useState<{ choice: ClosingChoice; carryToDate: string | null } | null>(
+    null
+  );
+
   const todayISO = new Date().toISOString().slice(0, 10);
   const carryOptions = carryDateOptions(todayISO);
 
-  async function submitChoice(choice: ClosingChoice, extra?: { note?: string; carryToDate?: string }) {
+  useEffect(() => {
+    fetch("/api/closing/today")
+      .then((res) => res.json())
+      .then((data) => setExistingToday(data.existing ?? null))
+      .catch(() => {});
+  }, []);
+
+  async function doSubmit(choice: ClosingChoice, extra?: { note?: string; carryToDate?: string }) {
     setSubmitting(true);
     setError(null);
     try {
@@ -107,6 +148,7 @@ export default function ClosingPage() {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error ?? "收光失敗,請重試。");
       }
+      setLastSubmitted({ choice, carryToDate: extra?.carryToDate ?? null });
       setSettled(true);
       // 低刺激收光動效(800–1200ms)後回居所——不是換頁式的成功訊息,是安靜地淡出。
       setTimeout(() => router.push("/"), 1000);
@@ -115,6 +157,30 @@ export default function ClosingPage() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  // 三個送出入口(暫且放下/寫下今天的直接送出按鈕、帶回的最終送出按鈕)都改
+  // 呼叫這裡,而不是直接呼叫 doSubmit——今天已有紀錄時先跳確認對話框,由使用者
+  // 決定取代或保留原本的,不得替使用者決定。
+  function requestSubmit(choice: ClosingChoice, extra?: { note?: string; carryToDate?: string }) {
+    if (existingToday) {
+      setPendingSubmit({ choice, extra });
+      return;
+    }
+    doSubmit(choice, extra);
+  }
+
+  function confirmOverwrite() {
+    if (!pendingSubmit) return;
+    const { choice, extra } = pendingSubmit;
+    setPendingSubmit(null);
+    doSubmit(choice, extra);
+  }
+
+  // 保留原本的:不寫入任何東西,直接回居所,維持既有那筆紀錄有效。
+  function keepExisting() {
+    setPendingSubmit(null);
+    router.push("/");
   }
 
   return (
@@ -154,19 +220,32 @@ export default function ClosingPage() {
 
       <h3>今天怎麼處置</h3>
       {error && <div className="warn">{error}</div>}
+      {pendingSubmit && (
+        <div className="item cl warn" role="alertdialog">
+          <b>今天已經收過光了({existingToday?.title}),要用新的取代嗎?</b>
+          <small>選「保留原本的」不會寫入任何東西,今天原本那筆紀錄會維持不變。</small>
+          <div className="two" style={{ marginTop: 8 }}>
+            <button onClick={keepExisting}>保留原本的</button>
+            <button className="primary" onClick={confirmOverwrite}>
+              取代
+            </button>
+          </div>
+        </div>
+      )}
       {!carryStep &&
+        !pendingSubmit &&
         CHOICES.map((c) => (
           <button
             key={c.choice}
             className="item cl"
             disabled={submitting}
-            onClick={() => (c.choice === "carry" ? setCarryStep(true) : submitChoice(c.choice))}
+            onClick={() => (c.choice === "carry" ? setCarryStep(true) : requestSubmit(c.choice))}
           >
             <b>{c.label}</b>
             <small>{c.note}</small>
           </button>
         ))}
-      {carryStep && (
+      {carryStep && !pendingSubmit && (
         <div className="item cl">
           <b>帶回哪一天</b>
           <small>選一天,明天起七日內。</small>
@@ -199,7 +278,7 @@ export default function ClosingPage() {
             <button
               className="primary"
               disabled={submitting || !carryDate}
-              onClick={() => carryDate && submitChoice("carry", { note: carryNote, carryToDate: carryDate })}
+              onClick={() => carryDate && requestSubmit("carry", { note: carryNote, carryToDate: carryDate })}
             >
               {submitting ? "送出中…" : "帶回"}
             </button>
@@ -208,7 +287,7 @@ export default function ClosingPage() {
       )}
       {settled && (
         <div className="settle" role="status">
-          已收光
+          {lastSubmitted && feedbackText(lastSubmitted.choice, lastSubmitted.carryToDate)}
         </div>
       )}
       <div className="note">
