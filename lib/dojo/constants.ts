@@ -41,6 +41,30 @@ export const GUANGFA: Record<GuangfaKey, [string, string, string]> = {
 
 export type Privacy = "私人" | "限閱" | "公開";
 
+// 行光牌與收光系統・地基實作(2026-08-04,補充裁決01):四個新欄位,幫收光、
+// 行光牌、知識煉金站在同一組欄位上。委派書提到的存量資料風險(對照 DB-04
+// 加欄位的舊例)經回報確認不適用於 DojoEntry——這裡是純前端記憶體狀態,不
+// 持久化,沒有真的在累積的存量資料,三筆示範資料由這裡直接補齊初始值即可。
+export type SourceType = "practice" | "forage" | "work" | "service" | "archive" | "rest" | "alchemy";
+export type TraceLevel = "daily" | "accumulated" | "permanent";
+// 值域裁決(補充裁決01之2):一般／收納／隱藏。本輪只建欄位、只寫預設值
+// 「一般」,不實作任何依賴它的行為(收納/隱藏的實際操作留待痕跡卡片那一輪)。
+export type TraceStatus = "一般" | "收納" | "隱藏";
+
+// space → sourceType 的對應(委派書只列了值域,沒給對應表,依各場域既有的
+// 中文描述直接對應,無歧義):修習所=practice、野採=forage、織光堂=work、
+// 聊解室=service、道藏=archive、收光=rest(委派書步驟三本身已明訂)。
+// alchemy(知識煉金)沒有對應的 space,是這輪額外支援的第七個 sourceType 值,
+// 目前沒有 UI 入口會寫入這個值。
+export const SPACE_TO_SOURCE_TYPE: Record<SpaceKey, SourceType> = {
+  practice: "practice",
+  forage: "forage",
+  weaving: "work",
+  liaojie: "service",
+  dao: "archive",
+  closing: "rest",
+};
+
 export type DojoEntry = {
   id: number;
   title: string;
@@ -57,6 +81,13 @@ export type DojoEntry = {
   freq?: number;
   // 強度(修正委派書 v1.0 四):1–10,與頻率並列、各自獨立可清除,規則同頻率。
   intensity?: number;
+  // 以下四個是地基實作新增欄位:必填,不存在留空的合法路徑(委派書步驟二
+  // 「必做」)——建立資料時一律寫入初始值,不靠空值 fallback 補救,型別上
+  // 設成必填讓 TypeScript 在編譯期擋下任何遺漏的建立路徑。
+  sourceType: SourceType;
+  traceLevel: TraceLevel;
+  traceStatus: TraceStatus;
+  viewCount: number;
 };
 
 // 雛形內建的三筆示範資料,直接沿用。
@@ -71,6 +102,10 @@ export const INITIAL_ENTRIES: DojoEntry[] = [
     date: "今天",
     guangxing: "ning",
     guangfa: null,
+    sourceType: "practice",
+    traceLevel: "daily",
+    traceStatus: "一般",
+    viewCount: 0,
   },
   {
     id: 2,
@@ -82,6 +117,10 @@ export const INITIAL_ENTRIES: DojoEntry[] = [
     date: "今天",
     guangxing: null,
     guangfa: null,
+    sourceType: "forage",
+    traceLevel: "daily",
+    traceStatus: "一般",
+    viewCount: 0,
   },
   {
     id: 3,
@@ -93,5 +132,9 @@ export const INITIAL_ENTRIES: DojoEntry[] = [
     date: "今天",
     guangxing: "lian",
     guangfa: null,
+    sourceType: "work",
+    traceLevel: "daily",
+    traceStatus: "一般",
+    viewCount: 0,
   },
 ];

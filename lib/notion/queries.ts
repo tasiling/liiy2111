@@ -428,6 +428,13 @@ export async function findKnowledgeEntryByTitle(title: string) {
   return pages[0] ? mapKnowledge(pages[0]) : null;
 }
 
+// 依 id 直接取單一 DB-14 資料列(「標記已處理」按鈕用:前端已經從居所接續
+// 卡片拿到對應的 Notion page id,不需要再靠標題比對重新找一次)。
+export async function getKnowledgeEntry(id: string) {
+  const p = await withNotionRateLimit(() => notion().pages.retrieve({ page_id: id }));
+  return mapKnowledge(p as NotionPage);
+}
+
 // --- DB-11 服務原子庫:P3 第 2 步「服務組合」支援,依月主題包能量關鍵字比對 ---
 export function mapAtom(p: NotionPage) {
   return {

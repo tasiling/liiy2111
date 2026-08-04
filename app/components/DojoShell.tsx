@@ -13,10 +13,14 @@ import {
   SPACES,
   GUANGXING,
   GUANGFA,
+  SPACE_TO_SOURCE_TYPE,
   type SpaceKey,
   type GuangxingKey,
   type GuangfaKey,
   type Privacy,
+  type SourceType,
+  type TraceLevel,
+  type TraceStatus,
 } from "@/lib/dojo/constants";
 import { useBackStack, useBackableState } from "@/lib/dojo/backstack";
 import { PARENT_ROUTE, ROUTE_LABEL, USE_BROWSER_BACK, NO_BACK_BUTTON } from "@/lib/dojo/backroutes";
@@ -151,6 +155,9 @@ function QuickAddModal({
     guangxing: GuangxingKey | null;
     guangfa: GuangfaKey | null;
     privacy: Privacy;
+    traceLevel: TraceLevel;
+    traceStatus: TraceStatus;
+    viewCount: number;
   };
   presetSpace?: SpaceKey;
   presetKind?: string;
@@ -163,6 +170,10 @@ function QuickAddModal({
     guangxing: GuangxingKey | null;
     guangfa: GuangfaKey | null;
     privacy: Privacy;
+    sourceType: SourceType;
+    traceLevel: TraceLevel;
+    traceStatus: TraceStatus;
+    viewCount: number;
   }) => void;
 }) {
   const [title, setTitle] = useState(entry?.title ?? "");
@@ -173,6 +184,10 @@ function QuickAddModal({
   const [guangfa, setGuangfa] = useState<GuangfaKey | null>(entry?.guangfa ?? null);
   const [privacy, setPrivacy] = useState<Privacy>(entry?.privacy ?? "私人");
   const [error, setError] = useState<string | null>(null);
+  // sourceType 不是這個表單能直接選的欄位,是依「場域」衍生出來的(見
+  // SPACE_TO_SOURCE_TYPE),送出時才依當下選定的 space 算;traceLevel/
+  // traceStatus/viewCount 這個表單沒有 UI 可以編輯,編輯既有紀錄時原樣保留,
+  // 新建時給地基實作裁決的初始值(daily／一般／0)。
 
   // Esc 鍵關閉,對齊雛形點擊遮罩關閉的體驗(bottom sheet 常見互動)。
   useEffect(() => {
@@ -196,6 +211,10 @@ function QuickAddModal({
       guangxing,
       guangfa,
       privacy,
+      sourceType: SPACE_TO_SOURCE_TYPE[space],
+      traceLevel: entry?.traceLevel ?? "daily",
+      traceStatus: entry?.traceStatus ?? "一般",
+      viewCount: entry?.viewCount ?? 0,
     });
   }
 
