@@ -7,7 +7,15 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useDojo } from "@/lib/dojo/store";
-import { SPACES, GUANGXING, GUANGFA, type SpaceKey, type GuangxingKey, type GuangfaKey } from "@/lib/dojo/constants";
+import {
+  SPACES,
+  GUANGXING,
+  GUANGFA,
+  SPACE_TO_SOURCE_TYPE,
+  type SpaceKey,
+  type GuangxingKey,
+  type GuangfaKey,
+} from "@/lib/dojo/constants";
 import { formatTimer } from "@/lib/dojo/format";
 
 const MINUTE_OPTIONS = [25, 45, 60, 90];
@@ -75,6 +83,10 @@ export default function TimerPage() {
       privacy: "私人",
       guangxing,
       guangfa,
+      sourceType: SPACE_TO_SOURCE_TYPE[space],
+      traceLevel: "daily",
+      traceStatus: "一般",
+      viewCount: 0,
     });
     setRemainingSeconds(initialSeconds);
     router.push("/practice");

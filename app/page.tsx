@@ -24,12 +24,13 @@ type TodayTask = {
   當場主題?: string;
 };
 
-// 居所「回到哪裡」(收光三選項與居所接續規格 v1.0 §二):兩個來源依序取用,
-// 最多 3 張——不依賴使用者一定要做過收光(§0.3),沒收光的日子這裡照樣能有
-// 內容(來自 Source B1)。零張時這個區塊要整個不顯示,不能出現空狀態文字,
-// 所以不用既有的 loadingTasks/tasksError 那套(那套本身就會在零筆時顯示文字)。
+// 居所「回到哪裡」(收光三選項與居所接續規格 v1.0 §二;行光牌與收光系統・
+// 地基實作 v2.0/補充裁決01 追加「標記已處理」):兩個來源依序取用,最多 3
+// 張——不依賴使用者一定要做過收光(§0.3),沒收光的日子這裡照樣能有內容
+// (來自 Source B1)。零張時這個區塊要整個不顯示,不能出現空狀態文字,所以
+// 不用既有的 loadingTasks/tasksError 那套(那套本身就會在零筆時顯示文字)。
 type ContinuationCard =
-  | { source: "carry"; text: string }
+  | { source: "carry"; id: string; text: string }
   | { source: "b1"; text: string; detailId: string; sessionId: string | null };
 
 function GuangxingTodayStrip() {
@@ -62,6 +63,7 @@ export default function HomePage() {
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [tasksError, setTasksError] = useState<string | null>(null);
   const [continuationCards, setContinuationCards] = useState<ContinuationCard[]>([]);
+  const [resolvingId, setResolvingId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,6 +79,21 @@ export default function HomePage() {
       cancelled = true;
     };
   }, []);
+
+  // 「標記已處理」(補充裁決01§一之3):按下才算消化掉,不是打開卡片就算。
+  // 成功後直接把這張卡從畫面上拿掉,不用整批重新打 API——伺服器那邊已經
+  // 寫入 carryResolvedAt,下次真的重新整理頁面時也不會再撈到它。
+  async function resolveCard(id: string) {
+    setResolvingId(id);
+    try {
+      const res = await fetch(`/api/closing/${id}/resolve`, { method: "PATCH" });
+      if (res.ok) {
+        setContinuationCards((prev) => prev.filter((c) => !(c.source === "carry" && c.id === id)));
+      }
+    } finally {
+      setResolvingId(null);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -147,9 +164,9 @@ export default function HomePage() {
       {continuationCards.length > 0 && (
         <>
           <h3>回到哪裡</h3>
-          {continuationCards.map((c, i) =>
+          {continuationCards.map((c) =>
             c.source === "b1" ? (
-              <button key={i} className="item dw" onClick={() => router.push(`/sanko?detailId=${c.detailId}`)}>
+              <button key={c.detailId} className="item dw" onClick={() => router.push(`/sanko?detailId=${c.detailId}`)}>
                 <span className="status">
                   <span className="dot" />
                   日上三更
@@ -157,12 +174,19 @@ export default function HomePage() {
                 <b>{c.text}</b>
               </button>
             ) : (
-              <div key={i} className="item cl">
+              <div key={c.id} className="item cl">
                 <span className="status">
                   <span className="dot" />
-                  帶回明天
+                  帶回
                 </span>
                 <b>{c.text}</b>
+                <button
+                  style={{ marginTop: 6 }}
+                  disabled={resolvingId === c.id}
+                  onClick={() => resolveCard(c.id)}
+                >
+                  {resolvingId === c.id ? "處理中…" : "標記已處理"}
+                </button>
               </div>
             )
           )}

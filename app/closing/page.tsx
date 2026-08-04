@@ -30,12 +30,19 @@
 // 欄位,沿用 DojoEntry 語意寫進 DB-14):三個選項是「今天整體怎麼結束」的一次性
 // 動作,不改動任何一筆痕跡的狀態(§0.1)——這裡呼叫 POST /api/closing,不碰
 // useDojo() 的 entries。「暫且放下」「直接收光」送出後行為完全相同,只有
-// choice 值不同;「帶回明天」多一步可選填一句話(可略過)。三者送出成功後都
-// 播放低刺激收光動效(800–1200ms)再回居所(§四)。
+// choice 值不同。三者送出成功後都播放低刺激收光動效(800–1200ms)再回居所。
+//
+// 行光牌與收光系統・地基實作 v2.0(2026-08-04,補充裁決01)追加:「帶回」不
+// 再固定是明天,改成按鈕列選「明天起七日內」的任一天(全站禁用 <select>、
+// 日曆元件在手機上太慢——照抄委派書原文的理由)。一句話仍然選填,可略過。
+// 選項本身的中文標題維持「帶回明天」不變(委派書表格明訂的三個固定值,沒有
+// 說要隨 carryToDate 變動),UI 上把入口按鈕改標「帶回」以避免跟實際選的
+// 日期矛盾。
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useDojo } from "@/lib/dojo/store";
 import { SPACES, GUANGXING, GUANGFA, type DojoEntry } from "@/lib/dojo/constants";
+import { carryDateOptions } from "@/lib/closing/notionFormat";
 import {
   resolveHawkinsLevel,
   formatFreqIntensityLabel,
@@ -49,7 +56,7 @@ import ExistingFeatureLinks from "../components/ExistingFeatureLinks";
 type ClosingChoice = "carry" | "pause" | "close";
 
 const CHOICES: { choice: ClosingChoice; label: string; note: string }[] = [
-  { choice: "carry", label: "帶回明天", note: "建立一個溫和的接續入口。" },
+  { choice: "carry", label: "帶回", note: "選一天,建立一個溫和的接續入口。" },
   { choice: "pause", label: "暫且放下", note: "不建立待辦,現在先休息。" },
   { choice: "close", label: "直接收光", note: "今天就在此結束,不留任何提示。" },
 ];
@@ -57,27 +64,44 @@ const CHOICES: { choice: ClosingChoice; label: string; note: string }[] = [
 const DEFAULT_FREQ = 500;
 const DEFAULT_INTENSITY = 5;
 
+const WD = ["日", "一", "二", "三", "四", "五", "六"];
+
+// 按鈕標籤:第 1 天「明天」、第 2 天「後天」,其餘用日期(中文口語沒有更多
+// 天數的專用稱呼)——每個按鈕都加註星期幾,方便使用者不用自己心算對到哪天。
+function fmtCarryOption(iso: string, dayIndex: number): string {
+  const d = new Date(iso + "T00:00:00");
+  const wd = `週${WD[d.getDay()]}`;
+  if (dayIndex === 0) return `明天・${wd}`;
+  if (dayIndex === 1) return `後天・${wd}`;
+  return `${d.getMonth() + 1}/${d.getDate()}・${wd}`;
+}
+
 export default function ClosingPage() {
   const router = useRouter();
   const { entries } = useDojo();
   const todayEntries = entries.filter((e) => e.date === "今天" || e.date === "剛剛");
 
-  // 「帶回明天」是唯一有額外步驟的選項:點下去先展開一句話輸入框(可留空),
-  // 按確定才真的送出;另外兩個選項點下去就直接送出,不需要中間狀態。
+  // 「帶回」是唯一有額外步驟的選項:點下去先展開日期按鈕列(必選)＋一句話
+  // 輸入框(可留空),按確定才真的送出;另外兩個選項點下去就直接送出,不需要
+  // 中間狀態。
   const [carryStep, setCarryStep] = useState(false);
+  const [carryDate, setCarryDate] = useState<string | null>(null);
   const [carryNote, setCarryNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [settled, setSettled] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function submitChoice(choice: ClosingChoice, note?: string) {
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const carryOptions = carryDateOptions(todayISO);
+
+  async function submitChoice(choice: ClosingChoice, extra?: { note?: string; carryToDate?: string }) {
     setSubmitting(true);
     setError(null);
     try {
       const res = await fetch("/api/closing", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ choice, note }),
+        body: JSON.stringify({ choice, note: extra?.note, carryToDate: extra?.carryToDate }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -144,21 +168,40 @@ export default function ClosingPage() {
         ))}
       {carryStep && (
         <div className="item cl">
-          <b>帶回明天</b>
-          <small>可以寫一句話,亦可略過。</small>
+          <b>帶回哪一天</b>
+          <small>選一天,明天起七日內。</small>
+          <div className="row" style={{ marginTop: 8 }}>
+            {carryOptions.map((iso, i) => (
+              <button key={iso} className={carryDate === iso ? "on" : ""} onClick={() => setCarryDate(iso)}>
+                {fmtCarryOption(iso, i)}
+              </button>
+            ))}
+          </div>
+          <small style={{ display: "block", marginTop: 10 }}>可以寫一句話,亦可略過。</small>
           <textarea
             className="field"
             style={{ marginTop: 8 }}
             value={carryNote}
             onChange={(e) => setCarryNote(e.target.value)}
-            placeholder="想帶到明天的一句話(選填)"
+            placeholder="想帶到那一天的一句話(選填)"
           />
           <div className="two" style={{ marginTop: 8 }}>
-            <button onClick={() => { setCarryStep(false); setCarryNote(""); }} disabled={submitting}>
+            <button
+              onClick={() => {
+                setCarryStep(false);
+                setCarryDate(null);
+                setCarryNote("");
+              }}
+              disabled={submitting}
+            >
               取消
             </button>
-            <button className="primary" onClick={() => submitChoice("carry", carryNote)} disabled={submitting}>
-              {submitting ? "送出中…" : "帶回明天"}
+            <button
+              className="primary"
+              disabled={submitting || !carryDate}
+              onClick={() => carryDate && submitChoice("carry", { note: carryNote, carryToDate: carryDate })}
+            >
+              {submitting ? "送出中…" : "帶回"}
             </button>
           </div>
         </div>
