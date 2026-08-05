@@ -22,7 +22,7 @@ import {
   relationProp,
   urlProp,
 } from "./properties";
-import { queryAll, getSession, findJournalEntryByTitle } from "./queries";
+import { queryAll, getSession, findJournalEntryByTitle, getTraceEntry } from "./queries";
 import { readTitle } from "./properties";
 import {
   JOURNAL_QUESTIONS,
@@ -31,6 +31,7 @@ import {
   type JournalAnswers,
 } from "@/lib/journal/notionFormat";
 import type { SpaceKey, SourceType } from "@/lib/dojo/constants";
+import { TRACE_ACCUMULATE_VIEW_THRESHOLD } from "@/lib/trace/rules";
 
 // Session 編號格式:S-YYYYMMDD-流水號(總綱 DB-03)。流水號以當日已存在筆數 +1 計算。
 export async function nextSessionCode(dateISO: string): Promise<string> {
@@ -349,7 +350,7 @@ export async function upsertJournalEntry(dateISO: string, answers: JournalAnswer
   return { id: page.id };
 }
 
-// --- DB-19 生活痕跡庫:寫入(補充裁決04/05,實作順序第2項,只做讀寫) ---
+// --- DB-19 生活痕跡庫:寫入(補充裁決04/05) ---
 // 建立時只寫必要欄位:traceLevel/traceStatus/viewCount 一律初始值(比照
 // DojoEntry 現行慣例,不留空值 fallback 的路徑),最後動靜時間寫入當下——這
 // 本身就是「建立」這個動靜(補充裁決04「什麼算動靜」表)。頻率/強度建立當下
@@ -379,16 +380,26 @@ export async function createTraceEntry(params: {
   return { id: page.id };
 }
 
-// 回看:重新計時 7 天(補充裁決04 §一)——只更新最後動靜時間。刻意不動
-// viewCount:回看次數的計數與 traceLevel 自動升級是補充裁決05 實作順序第4
-// 項,本輪(第2項)不做,不在這裡順手加。
-export async function touchTraceEntry(id: string) {
+// 回看:重新計時 7 天(補充裁決04 §一)+ 回看次數 +1;累積到門檻
+// (TRACE_ACCUMULATE_VIEW_THRESHOLD)自動升級 traceLevel 為 accumulated
+// (補充裁決05 實作順序第4項)。已經是 accumulated/permanent 的不重複判斷
+// 升級,單純更新次數與時間——這兩層本來就已經在下區、免淡,升級與否不影響
+// 顯示位置。
+export async function registerTraceView(id: string) {
+  const current = await getTraceEntry(id);
+  const nextViewCount = current.viewCount + 1;
+  const shouldUpgrade = current.traceLevel === "daily" && nextViewCount >= TRACE_ACCUMULATE_VIEW_THRESHOLD;
   await withNotionRateLimit(() =>
     notion().pages.update({
       page_id: id,
-      properties: { 最後動靜時間: dateProp(new Date().toISOString()) },
+      properties: {
+        viewCount: numberProp(nextViewCount),
+        最後動靜時間: dateProp(new Date().toISOString()),
+        ...(shouldUpgrade ? { traceLevel: selectProp("accumulated") } : {}),
+      },
     })
   );
+  return { viewCount: nextViewCount, traceLevel: shouldUpgrade ? "accumulated" : current.traceLevel };
 }
 
 // 標記頻率／強度本身也是一種動靜(補充裁決04「什麼算動靜」表),所以跟收光

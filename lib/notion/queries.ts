@@ -484,8 +484,8 @@ export async function findJournalEntryByTitle(title: string) {
 }
 
 // --- DB-19 生活痕跡庫:居所兩區(上區/下區)與淡去邏輯的資料層 ---
-// (補充裁決04/05)。實作順序第2項——只做讀寫,不含淡去邏輯本身(第3項)、
-// 不含回看次數計數/traceLevel 自動升級(第4項)、不含居所呈現(第5項)。
+// (補充裁決04/05)。淡去的實際判斷(7 天門檻)在 lib/trace/rules.ts,不在
+// 這裡——這裡只負責把候選集合縮小到查詢窗口內(補充裁決05 §2.1)。
 export function mapTrace(p: NotionPage) {
   return {
     id: p.id,
@@ -533,6 +533,13 @@ export async function listPersistentTraces() {
     ],
   });
   return pages.map(mapTrace);
+}
+
+// 依 id 直接取單一痕跡(回看/標記寫入前要先讀出目前的 viewCount/traceLevel
+// 才能決定要不要升級,見 lib/notion/mutations.ts registerTraceView())。
+export async function getTraceEntry(id: string) {
+  const p = await withNotionRateLimit(() => notion().pages.retrieve({ page_id: id }));
+  return mapTrace(p as NotionPage);
 }
 
 // --- DB-16 標籤詞庫:P3 比對結果顯示「命中標籤」名稱用 ---

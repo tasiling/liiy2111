@@ -79,9 +79,38 @@ export function DojoProvider({ children }: { children: ReactNode }) {
   const [modalOptions, setModalOptions] = useState<QuickAddOptions>({});
   const [timerConfig, setTimerConfig] = useState<TimerConfig>(DEFAULT_TIMER_CONFIG);
 
-  const addEntry = useCallback((entry: NewEntry) => {
-    setEntries((prev) => [...prev, { ...entry, id: Date.now(), date: "剛剛" }]);
+  const setEntryTraceId = useCallback((id: number, traceId: string) => {
+    setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, traceId } : e)));
   }, []);
+
+  // 補充裁決04/05(生活痕跡的淡去規則/持久化):建立的同時背景同步進 DB-19
+  // 生活痕跡庫,不擋 UI、失敗靜默(比照居所接續卡片既有的背景同步慣例)。
+  // 私人項目不建立痕跡——DB-19 沒有 privacy 欄位,無法在讀取端過濾私人內容,
+  // 唯一能維持「居所不顯示私人項目」既有保護(v1.3 §…既有規則)的做法是私人
+  // 項目一開始就不寫進 Notion,不是寫了再指望讀取端擋掉。這也代表目前一律
+  // privacy="私人" 的建立路徑(如 app/timer/page.tsx 的 finishTimer())不會
+  // 產生任何痕跡紀錄——這是這個保守選擇的直接後果,不是遺漏,交付時已標明。
+  const addEntry = useCallback((entry: NewEntry) => {
+    const id = Date.now();
+    setEntries((prev) => [...prev, { ...entry, id, date: "剛剛" }]);
+    if (entry.privacy !== "私人") {
+      fetch("/api/traces", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          標題: entry.title,
+          內容: entry.note,
+          space: entry.space,
+          sourceType: entry.sourceType,
+        }),
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((json) => {
+          if (json?.id) setEntryTraceId(id, json.id);
+        })
+        .catch(() => {});
+    }
+  }, [setEntryTraceId]);
 
   const updateEntry = useCallback((id: number, entry: NewEntry) => {
     setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, ...entry } : e)));
@@ -94,16 +123,44 @@ export function DojoProvider({ children }: { children: ReactNode }) {
   // 測頻只在收光復盤階段設定(v1.3 §3.5.1),獨立成一個動作而不是借用
   // updateEntry,避免呼叫端得為了改一個數值湊出整筆 NewEntry。freq=null 代表
   // 清除標記,回到「尚未標記」狀態。
-  const setEntryFreq = useCallback((id: number, freq: number | null) => {
-    setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, freq: freq ?? undefined } : e)));
-  }, []);
+  //
+  // 補充裁決04/05:標記頻率/強度本身是一種動靜,標記過的痕跡永久免淡(§一)
+  // ——只有在「設定真的數值」且這筆有對應的 traceId(背景建立已成功)時,
+  // 才背景同步進 DB-19(失敗靜默,同 addEntry)。清除標記(freq=null)刻意
+  // 不同步:「取消標記後這筆是否要重新開始淡去」沒有被裁決過,本輪不猜測,
+  // 只同步「設定」這個方向,清除仍然只影響本地/收光復盤畫面。
+  const setEntryFreq = useCallback(
+    (id: number, freq: number | null) => {
+      setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, freq: freq ?? undefined } : e)));
+      const target = entries.find((e) => e.id === id);
+      if (freq != null && target?.traceId) {
+        fetch(`/api/traces/${target.traceId}/measure`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 頻率: freq }),
+        }).catch(() => {});
+      }
+    },
+    [entries]
+  );
 
   // 強度與頻率是兩個獨立欄位(修正委派書 v1.0 四):各自獨立的 setter,清除
   // 其中一個不會動到另一個——不要合併成同一個函式再用參數判斷要改哪一個,
-  // 那樣呼叫端反而更容易誤觸另一個欄位。
-  const setEntryIntensity = useCallback((id: number, intensity: number | null) => {
-    setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, intensity: intensity ?? undefined } : e)));
-  }, []);
+  // 那樣呼叫端反而更容易誤觸另一個欄位。背景同步規則同 setEntryFreq。
+  const setEntryIntensity = useCallback(
+    (id: number, intensity: number | null) => {
+      setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, intensity: intensity ?? undefined } : e)));
+      const target = entries.find((e) => e.id === id);
+      if (intensity != null && target?.traceId) {
+        fetch(`/api/traces/${target.traceId}/measure`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 強度: intensity }),
+        }).catch(() => {});
+      }
+    },
+    [entries]
+  );
 
   const openQuickAdd = useCallback((opts: QuickAddOptions = {}) => {
     setModalOptions(opts);
