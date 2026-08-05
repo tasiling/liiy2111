@@ -10,6 +10,7 @@ import {
   readRelationIds,
   readUrl,
 } from "./properties";
+import { JOURNAL_QUESTIONS, type JournalQuestionKey } from "@/lib/journal/notionFormat";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type QueryFilter = any;
@@ -453,6 +454,26 @@ export async function listActiveServiceAtoms() {
     select: { equals: "啟用" },
   });
   return pages.map(mapAtom);
+}
+
+// --- DB-18 日記庫:收光改版 3.4/3.5,一天一筆,標題「日記-YYYYMMDD」 ---
+export function mapJournal(p: NotionPage) {
+  const answers = {} as Record<JournalQuestionKey, string>;
+  for (const q of JOURNAL_QUESTIONS) answers[q.key] = readRichText(p, q.key);
+  return {
+    id: p.id,
+    標題: readTitle(p, "標題"),
+    日期: readDateStart(p, "日期"),
+    answers,
+  };
+}
+
+export async function findJournalEntryByTitle(title: string) {
+  const pages = await queryAll(DATA_SOURCES.DB18_日記庫, {
+    property: "標題",
+    title: { equals: title },
+  });
+  return pages[0] ? mapJournal(pages[0]) : null;
 }
 
 // --- DB-16 標籤詞庫:P3 比對結果顯示「命中標籤」名稱用 ---

@@ -1,28 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findKnowledgeEntryByTitle } from "@/lib/notion/queries";
-import { createKnowledgeEntry, updateKnowledgeEntry } from "@/lib/notion/mutations";
+import { createKnowledgeEntry, updateKnowledgeEntry, upsertJournalEntry } from "@/lib/notion/mutations";
 import {
   CLOSING_CHOICE_TITLE,
   closingRecordTitle,
   encodeClosingContent,
   isValidCarryToDate,
+  type ClosingChoice,
   type ClosingContent,
 } from "@/lib/closing/notionFormat";
+import { hasAnyJournalAnswer, type JournalAnswers } from "@/lib/journal/notionFormat";
 
 // Notion 是唯一真相來源,讀取一律即時查詢,不吃 Route Handler 快取。
 export const dynamic = "force-dynamic";
 
 // 收光三選項(《收光三選項與居所接續》v1.0,行光牌與收光系統・地基實作
-// v2.0/補充裁決01 追加 carryToDate):三個選項都只是「今天整體怎麼結束」的
-// 一次性動作,不改動任何一筆痕跡的狀態(§0.1)。序列化存進 DB-14 既有的
-// 「內容」欄——標題「收光紀錄-YYYYMMDD」一天一筆,若當日已有紀錄則覆蓋
-// (擁有者可能改變主意),不累積多筆。
+// v2.0/補充裁決01 追加 carryToDate,補充裁決03 改版):三個選項都只是「今天
+// 整體怎麼結束」的一次性動作,不改動任何一筆痕跡的狀態(§0.1)。序列化存進
+// DB-14 既有的「內容」欄——標題「收光紀錄-YYYYMMDD」一天一筆,若當日已有
+// 紀錄則覆蓋,不累積多筆。是否要覆蓋、要不要提示使用者,是前端的職責
+// (GET /api/closing/today 給前端判斷用)——這裡維持單純的「呼叫就寫入」,
+// 不在伺服器端額外擋「已存在」的情況。
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { choice, note, carryToDate } = body as {
-    choice?: "carry" | "pause" | "close";
+  const { choice, note, carryToDate, journal } = body as {
+    choice?: ClosingChoice;
     note?: string;
     carryToDate?: string;
+    journal?: JournalAnswers;
   };
 
   const choiceTitle = choice ? CLOSING_CHOICE_TITLE[choice] : undefined;
@@ -65,6 +70,13 @@ export async function POST(req: NextRequest) {
     await updateKnowledgeEntry(existing.id, { 內容: encodeClosingContent(content) });
   } else {
     await createKnowledgeEntry({ 標題: notionTitle, 內容: encodeClosingContent(content) });
+  }
+
+  // 3.4/3.5:日記是選填的附加動作,只有「寫下今天」「帶回明天」這兩個選項的
+  // 流程會提供入口,且使用者真的有寫東西(hasAnyJournalAnswer)才動 DB-18——
+  // 沒開日記面板、或開了但七題全部留白,都不建立/更新日記紀錄。
+  if (journal && hasAnyJournalAnswer(journal)) {
+    await upsertJournalEntry(todayISO, journal);
   }
 
   return NextResponse.json({ ok: true });
