@@ -22,8 +22,14 @@ import {
   relationProp,
   urlProp,
 } from "./properties";
-import { queryAll, getSession } from "./queries";
+import { queryAll, getSession, findJournalEntryByTitle } from "./queries";
 import { readTitle } from "./properties";
+import {
+  JOURNAL_QUESTIONS,
+  journalRecordTitle,
+  normalizeJournalAnswers,
+  type JournalAnswers,
+} from "@/lib/journal/notionFormat";
 
 // Session 編號格式:S-YYYYMMDD-流水號(總綱 DB-03)。流水號以當日已存在筆數 +1 計算。
 export async function nextSessionCode(dateISO: string): Promise<string> {
@@ -315,6 +321,31 @@ export async function findSessionCodeById(sessionId: string): Promise<string> {
   const page = await withNotionRateLimit(() => notion().pages.retrieve({ page_id: sessionId }));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return readTitle(page as any, "Session 編號");
+}
+
+// --- DB-18 日記庫:收光改版 3.4/3.5(寫下今天展開日記、帶回明天也提供日記入口) ---
+// 一天一筆,標題「日記-YYYYMMDD」,當日已有紀錄則覆蓋(比照收光紀錄慣例)——
+// 七題一律全寫(normalizeJournalAnswers 把沒填的正規化成空字串),不是只補
+// 有值的欄位。呼叫端(POST /api/closing)已先用 hasAnyJournalAnswer() 判斷
+// 這次有沒有真的寫東西,沒寫就不會呼叫這支函式,不會建立空白日記列。
+export async function upsertJournalEntry(dateISO: string, answers: JournalAnswers) {
+  const title = journalRecordTitle(dateISO);
+  const normalized = normalizeJournalAnswers(answers);
+  const properties: Record<string, ReturnType<typeof richTextProp>> = {};
+  for (const q of JOURNAL_QUESTIONS) properties[q.key] = richTextProp(normalized[q.key]);
+
+  const existing = await findJournalEntryByTitle(title);
+  if (existing) {
+    await withNotionRateLimit(() => notion().pages.update({ page_id: existing.id, properties }));
+    return { id: existing.id };
+  }
+  const page = await withNotionRateLimit(() =>
+    notion().pages.create({
+      parent: { type: "data_source_id", data_source_id: DATA_SOURCES.DB18_日記庫 },
+      properties: { 標題: titleProp(title), 日期: dateProp(dateISO), ...properties },
+    })
+  );
+  return { id: page.id };
 }
 
 // --- DB-09 回饋紀錄:P6 回饋快填 ---

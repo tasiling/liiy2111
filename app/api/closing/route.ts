@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findKnowledgeEntryByTitle } from "@/lib/notion/queries";
-import { createKnowledgeEntry, updateKnowledgeEntry } from "@/lib/notion/mutations";
+import { createKnowledgeEntry, updateKnowledgeEntry, upsertJournalEntry } from "@/lib/notion/mutations";
 import {
   CLOSING_CHOICE_TITLE,
   closingRecordTitle,
@@ -9,6 +9,7 @@ import {
   type ClosingChoice,
   type ClosingContent,
 } from "@/lib/closing/notionFormat";
+import { hasAnyJournalAnswer, type JournalAnswers } from "@/lib/journal/notionFormat";
 
 // Notion 是唯一真相來源,讀取一律即時查詢,不吃 Route Handler 快取。
 export const dynamic = "force-dynamic";
@@ -22,10 +23,11 @@ export const dynamic = "force-dynamic";
 // 不在伺服器端額外擋「已存在」的情況。
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { choice, note, carryToDate } = body as {
+  const { choice, note, carryToDate, journal } = body as {
     choice?: ClosingChoice;
     note?: string;
     carryToDate?: string;
+    journal?: JournalAnswers;
   };
 
   const choiceTitle = choice ? CLOSING_CHOICE_TITLE[choice] : undefined;
@@ -68,6 +70,13 @@ export async function POST(req: NextRequest) {
     await updateKnowledgeEntry(existing.id, { 內容: encodeClosingContent(content) });
   } else {
     await createKnowledgeEntry({ 標題: notionTitle, 內容: encodeClosingContent(content) });
+  }
+
+  // 3.4/3.5:日記是選填的附加動作,只有「寫下今天」「帶回明天」這兩個選項的
+  // 流程會提供入口,且使用者真的有寫東西(hasAnyJournalAnswer)才動 DB-18——
+  // 沒開日記面板、或開了但七題全部留白,都不建立/更新日記紀錄。
+  if (journal && hasAnyJournalAnswer(journal)) {
+    await upsertJournalEntry(todayISO, journal);
   }
 
   return NextResponse.json({ ok: true });

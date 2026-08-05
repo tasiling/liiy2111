@@ -46,14 +46,19 @@
 //   的措辭(實際文案由擁有者核定,這裡先給草稿)。
 // - 3.3「直接收光」更名「寫下今天」,choice 值 close 改為語意相符的
 //   journal。
-// - 3.4/3.5(七題日記展開)本輪不做:日記內容要存哪裡還沒裁決(委派書
-//   補充裁決03§四之1 明訂「不要自己選一個做下去」),「寫下今天」目前仍是
-//   立即送出,還沒有展開日記題目——裁決回來後才會接上。
+// - 3.4/3.5(七題日記展開,2026-08-05 擁有者裁決§四之1選C:另開 DB-18 日記
+//   庫,不塞進 DB-14):「寫下今天」點下去展開七題(晨間組+夜間組全部同時
+//   列出,全部選填,不顯示完成度/進度條,不要求先選寫幾題);「帶回明天」
+//   選完日期與一句話之後,一樣提供「寫日記」入口,不想寫可以直接送出。兩個
+//   入口共用同一個 JournalQuestionsPanel,答案隨 POST /api/closing 的
+//   journal 欄位一起送出,DB-18 的讀寫集中在 lib/journal/notionFormat.ts +
+//   lib/notion/queries.ts/mutations.ts 的 upsertJournalEntry()。
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useDojo } from "@/lib/dojo/store";
 import { SPACES, GUANGXING, GUANGFA, type DojoEntry } from "@/lib/dojo/constants";
 import { carryDateOptions, fmtDateWD, type ClosingChoice } from "@/lib/closing/notionFormat";
+import { JOURNAL_QUESTIONS, type JournalAnswers } from "@/lib/journal/notionFormat";
 import {
   resolveHawkinsLevel,
   formatFreqIntensityLabel,
@@ -112,12 +117,19 @@ export default function ClosingPage() {
   const [settled, setSettled] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // 3.4:「寫下今天」點下去展開七題日記面板(不是立即送出)。
+  const [journalStep, setJournalStep] = useState(false);
+  // 3.5:「帶回明天」流程裡,選完日期/一句話之後,選擇要不要順便寫日記。
+  const [carryJournalOpen, setCarryJournalOpen] = useState(false);
+  // 兩個入口共用同一份答案暫存——同一次收光動作只會走其中一個入口。
+  const [journalAnswers, setJournalAnswers] = useState<JournalAnswers>({});
+
   // 3.1:進頁面先查今天是否已有收光紀錄,送出時若已存在就先擋下來問——不得
   // 靜默覆蓋。pendingSubmit 非 null 時代表確認對話框正在顯示,尚未真的送出。
   const [existingToday, setExistingToday] = useState<ExistingToday>(null);
   const [pendingSubmit, setPendingSubmit] = useState<{
     choice: ClosingChoice;
-    extra?: { note?: string; carryToDate?: string };
+    extra?: { note?: string; carryToDate?: string; journal?: JournalAnswers };
   } | null>(null);
   // 3.2:回饋文字要引用「剛剛送出的那個選擇」,不是目前畫面上的暫存狀態(例如
   // 送出後 carryStep 可能已經被使用者切換掉),所以送出成功當下另外記一份。
@@ -135,14 +147,22 @@ export default function ClosingPage() {
       .catch(() => {});
   }, []);
 
-  async function doSubmit(choice: ClosingChoice, extra?: { note?: string; carryToDate?: string }) {
+  async function doSubmit(
+    choice: ClosingChoice,
+    extra?: { note?: string; carryToDate?: string; journal?: JournalAnswers }
+  ) {
     setSubmitting(true);
     setError(null);
     try {
       const res = await fetch("/api/closing", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ choice, note: extra?.note, carryToDate: extra?.carryToDate }),
+        body: JSON.stringify({
+          choice,
+          note: extra?.note,
+          carryToDate: extra?.carryToDate,
+          journal: extra?.journal,
+        }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -162,7 +182,10 @@ export default function ClosingPage() {
   // 三個送出入口(暫且放下/寫下今天的直接送出按鈕、帶回的最終送出按鈕)都改
   // 呼叫這裡,而不是直接呼叫 doSubmit——今天已有紀錄時先跳確認對話框,由使用者
   // 決定取代或保留原本的,不得替使用者決定。
-  function requestSubmit(choice: ClosingChoice, extra?: { note?: string; carryToDate?: string }) {
+  function requestSubmit(
+    choice: ClosingChoice,
+    extra?: { note?: string; carryToDate?: string; journal?: JournalAnswers }
+  ) {
     if (existingToday) {
       setPendingSubmit({ choice, extra });
       return;
@@ -233,18 +256,48 @@ export default function ClosingPage() {
         </div>
       )}
       {!carryStep &&
+        !journalStep &&
         !pendingSubmit &&
         CHOICES.map((c) => (
           <button
             key={c.choice}
             className="item cl"
             disabled={submitting}
-            onClick={() => (c.choice === "carry" ? setCarryStep(true) : requestSubmit(c.choice))}
+            onClick={() => {
+              if (c.choice === "carry") return setCarryStep(true);
+              if (c.choice === "journal") return setJournalStep(true);
+              requestSubmit(c.choice);
+            }}
           >
             <b>{c.label}</b>
             <small>{c.note}</small>
           </button>
         ))}
+      {journalStep && !pendingSubmit && (
+        <div className="item cl">
+          <b>寫下今天</b>
+          <small>七題都可以留空,想寫幾題都可以,不想寫也能直接完成。</small>
+          <JournalQuestionsPanel answers={journalAnswers} onChange={setJournalAnswers} />
+          <div className="two" style={{ marginTop: 8 }}>
+            <button
+              onClick={() => {
+                setJournalStep(false);
+                setJournalAnswers({});
+              }}
+              disabled={submitting}
+            >
+              取消
+            </button>
+            <button
+              className="primary"
+              disabled={submitting}
+              onClick={() => requestSubmit("journal", { journal: journalAnswers })}
+            >
+              {submitting ? "送出中…" : "完成,送出"}
+            </button>
+          </div>
+        </div>
+      )}
       {carryStep && !pendingSubmit && (
         <div className="item cl">
           <b>帶回哪一天</b>
@@ -264,25 +317,64 @@ export default function ClosingPage() {
             onChange={(e) => setCarryNote(e.target.value)}
             placeholder="想帶到那一天的一句話(選填)"
           />
-          <div className="two" style={{ marginTop: 8 }}>
-            <button
-              onClick={() => {
-                setCarryStep(false);
-                setCarryDate(null);
-                setCarryNote("");
-              }}
-              disabled={submitting}
-            >
-              取消
-            </button>
-            <button
-              className="primary"
-              disabled={submitting || !carryDate}
-              onClick={() => carryDate && requestSubmit("carry", { note: carryNote, carryToDate: carryDate })}
-            >
-              {submitting ? "送出中…" : "帶回"}
-            </button>
-          </div>
+
+          {!carryJournalOpen && (
+            <>
+              <small style={{ display: "block", marginTop: 10 }}>
+                要不要順便寫下今天?不想寫可以直接結束。
+              </small>
+              <div className="two" style={{ marginTop: 8 }}>
+                <button
+                  onClick={() => {
+                    setCarryStep(false);
+                    setCarryDate(null);
+                    setCarryNote("");
+                  }}
+                  disabled={submitting}
+                >
+                  取消
+                </button>
+                <button onClick={() => setCarryJournalOpen(true)} disabled={submitting}>
+                  寫日記
+                </button>
+              </div>
+              <button
+                className="primary"
+                style={{ marginTop: 8, width: "100%" }}
+                disabled={submitting || !carryDate}
+                onClick={() => carryDate && requestSubmit("carry", { note: carryNote, carryToDate: carryDate })}
+              >
+                {submitting ? "送出中…" : "不寫,直接帶回"}
+              </button>
+            </>
+          )}
+
+          {carryJournalOpen && (
+            <>
+              <JournalQuestionsPanel answers={journalAnswers} onChange={setJournalAnswers} />
+              <div className="two" style={{ marginTop: 8 }}>
+                <button
+                  onClick={() => {
+                    setCarryJournalOpen(false);
+                    setJournalAnswers({});
+                  }}
+                  disabled={submitting}
+                >
+                  返回
+                </button>
+                <button
+                  className="primary"
+                  disabled={submitting || !carryDate}
+                  onClick={() =>
+                    carryDate &&
+                    requestSubmit("carry", { note: carryNote, carryToDate: carryDate, journal: journalAnswers })
+                  }
+                >
+                  {submitting ? "送出中…" : "完成,送出"}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
       {settled && (
@@ -294,6 +386,41 @@ export default function ClosingPage() {
         測試重點:三個處置選項是否足夠;復盤測頻是否讓人有壓力(不測也完全合法,不應該有任何提示要求一定要測)。
       </div>
     </section>
+  );
+}
+
+// 七題日記(3.4/3.5 共用):一次全部列出晨間組+夜間組,不分批展開;每題都
+// 只是「選填」,不顯示已填幾題/還剩幾題/進度條,不要求先選今天要寫多少
+// (委派書補充裁決03 §3.4 硬規則)。
+const JOURNAL_GROUPS = ["晨間", "夜間"] as const;
+
+function JournalQuestionsPanel({
+  answers,
+  onChange,
+}: {
+  answers: JournalAnswers;
+  onChange: (next: JournalAnswers) => void;
+}) {
+  return (
+    <div style={{ marginTop: 10 }}>
+      {JOURNAL_GROUPS.map((group) => (
+        <div key={group} style={{ marginTop: 8 }}>
+          <small style={{ display: "block", fontWeight: 600 }}>{group}組</small>
+          {JOURNAL_QUESTIONS.filter((q) => q.group === group).map((q) => (
+            <div key={q.key} style={{ marginTop: 8 }}>
+              <small style={{ display: "block" }}>{q.label}</small>
+              <textarea
+                className="field"
+                style={{ marginTop: 4 }}
+                value={answers[q.key] ?? ""}
+                onChange={(e) => onChange({ ...answers, [q.key]: e.target.value })}
+                placeholder="選填"
+              />
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
   );
 }
 
