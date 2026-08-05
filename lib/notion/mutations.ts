@@ -22,7 +22,7 @@ import {
   relationProp,
   urlProp,
 } from "./properties";
-import { queryAll, getSession, findJournalEntryByTitle } from "./queries";
+import { queryAll, getSession, findJournalEntryByTitle, getTraceEntry } from "./queries";
 import { readTitle } from "./properties";
 import {
   JOURNAL_QUESTIONS,
@@ -30,6 +30,8 @@ import {
   normalizeJournalAnswers,
   type JournalAnswers,
 } from "@/lib/journal/notionFormat";
+import type { SpaceKey, SourceType } from "@/lib/dojo/constants";
+import { TRACE_ACCUMULATE_VIEW_THRESHOLD } from "@/lib/trace/rules";
 
 // Session 編號格式:S-YYYYMMDD-流水號(總綱 DB-03)。流水號以當日已存在筆數 +1 計算。
 export async function nextSessionCode(dateISO: string): Promise<string> {
@@ -346,6 +348,76 @@ export async function upsertJournalEntry(dateISO: string, answers: JournalAnswer
     })
   );
   return { id: page.id };
+}
+
+// --- DB-19 生活痕跡庫:寫入(補充裁決04/05) ---
+// 建立時只寫必要欄位:traceLevel/traceStatus/viewCount 一律初始值(比照
+// DojoEntry 現行慣例,不留空值 fallback 的路徑),最後動靜時間寫入當下——這
+// 本身就是「建立」這個動靜(補充裁決04「什麼算動靜」表)。頻率/強度建立當下
+// 一律不填,測頻是後續獨立動作。
+export async function createTraceEntry(params: {
+  標題: string;
+  內容?: string;
+  space: SpaceKey;
+  sourceType: SourceType;
+}) {
+  const nowISO = new Date().toISOString();
+  const page = await withNotionRateLimit(() =>
+    notion().pages.create({
+      parent: { type: "data_source_id", data_source_id: DATA_SOURCES.DB19_生活痕跡庫 },
+      properties: {
+        標題: titleProp(params.標題),
+        ...(params.內容 ? { 內容: richTextProp(params.內容) } : {}),
+        space: selectProp(params.space),
+        sourceType: selectProp(params.sourceType),
+        traceLevel: selectProp("daily"),
+        traceStatus: selectProp("一般"),
+        viewCount: numberProp(0),
+        最後動靜時間: dateProp(nowISO),
+      },
+    })
+  );
+  return { id: page.id };
+}
+
+// 回看:重新計時 7 天(補充裁決04 §一)+ 回看次數 +1;累積到門檻
+// (TRACE_ACCUMULATE_VIEW_THRESHOLD)自動升級 traceLevel 為 accumulated
+// (補充裁決05 實作順序第4項)。已經是 accumulated/permanent 的不重複判斷
+// 升級,單純更新次數與時間——這兩層本來就已經在下區、免淡,升級與否不影響
+// 顯示位置。
+export async function registerTraceView(id: string) {
+  const current = await getTraceEntry(id);
+  const nextViewCount = current.viewCount + 1;
+  const shouldUpgrade = current.traceLevel === "daily" && nextViewCount >= TRACE_ACCUMULATE_VIEW_THRESHOLD;
+  await withNotionRateLimit(() =>
+    notion().pages.update({
+      page_id: id,
+      properties: {
+        viewCount: numberProp(nextViewCount),
+        最後動靜時間: dateProp(new Date().toISOString()),
+        ...(shouldUpgrade ? { traceLevel: selectProp("accumulated") } : {}),
+      },
+    })
+  );
+  return { viewCount: nextViewCount, traceLevel: shouldUpgrade ? "accumulated" : current.traceLevel };
+}
+
+// 標記頻率／強度本身也是一種動靜(補充裁決04「什麼算動靜」表),所以跟收光
+// 復盤測頻的既有規則一樣——只寫入這次真的動過的欄位,同時更新最後動靜時
+// 間。標記之後這筆痕跡會落入下區、永久免淡(補充裁決04 §2.2),那個「落入
+// 下區」的判斷屬於讀取端(listPersistentTraces 的查詢條件已經涵蓋),這裡只
+// 負責寫值。
+export async function markTraceMeasure(id: string, patch: { 頻率?: number; 強度?: number }) {
+  await withNotionRateLimit(() =>
+    notion().pages.update({
+      page_id: id,
+      properties: {
+        ...(patch.頻率 !== undefined ? { 頻率: numberProp(patch.頻率) } : {}),
+        ...(patch.強度 !== undefined ? { 強度: numberProp(patch.強度) } : {}),
+        最後動靜時間: dateProp(new Date().toISOString()),
+      },
+    })
+  );
 }
 
 // --- DB-09 回饋紀錄:P6 回饋快填 ---

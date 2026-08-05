@@ -88,6 +88,12 @@ export type DojoEntry = {
   traceLevel: TraceLevel;
   traceStatus: TraceStatus;
   viewCount: number;
+  // 補充裁決04/05(生活痕跡的淡去規則/持久化):對應 DB-19 生活痕跡庫那一筆的
+  // Notion page id。建立當下是背景非同步寫入,寫入成功前這裡是 undefined;
+  // 私人項目(privacy==="私人")則永遠不會有值——DB-19 沒有 privacy 欄位,
+  // 唯一能維持「居所不顯示私人項目」既有保護的做法是私人項目一開始就不建立
+  // 痕跡紀錄,不是建立了再靠讀取端過濾(見 lib/dojo/store.tsx addEntry())。
+  traceId?: string;
 };
 
 // 雛形內建的三筆示範資料,直接沿用。
