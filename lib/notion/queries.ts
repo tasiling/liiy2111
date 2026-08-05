@@ -1,5 +1,11 @@
 import { notion, withNotionRateLimit } from "./client";
-import { DATA_SOURCES, PLURK_TEMPLATE_TITLE_PREFIX, PLURK_DRAFT_TITLE_PREFIX, type SankoUpdateType } from "./schema";
+import {
+  DATA_SOURCES,
+  PLURK_TEMPLATE_TITLE_PREFIX,
+  PLURK_DRAFT_TITLE_PREFIX,
+  TRACE_QUERY_WINDOW_DAYS,
+  type SankoUpdateType,
+} from "./schema";
 import {
   readTitle,
   readRichText,
@@ -11,6 +17,7 @@ import {
   readUrl,
 } from "./properties";
 import { JOURNAL_QUESTIONS, type JournalQuestionKey } from "@/lib/journal/notionFormat";
+import type { SpaceKey, SourceType, TraceLevel, TraceStatus } from "@/lib/dojo/constants";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type QueryFilter = any;
@@ -474,6 +481,58 @@ export async function findJournalEntryByTitle(title: string) {
     title: { equals: title },
   });
   return pages[0] ? mapJournal(pages[0]) : null;
+}
+
+// --- DB-19 生活痕跡庫:居所兩區(上區/下區)與淡去邏輯的資料層 ---
+// (補充裁決04/05)。實作順序第2項——只做讀寫,不含淡去邏輯本身(第3項)、
+// 不含回看次數計數/traceLevel 自動升級(第4項)、不含居所呈現(第5項)。
+export function mapTrace(p: NotionPage) {
+  return {
+    id: p.id,
+    標題: readTitle(p, "標題"),
+    內容: readRichText(p, "內容"),
+    space: readSelect(p, "space") as SpaceKey | null,
+    sourceType: readSelect(p, "sourceType") as SourceType | null,
+    traceLevel: readSelect(p, "traceLevel") as TraceLevel | null,
+    traceStatus: readSelect(p, "traceStatus") as TraceStatus | null,
+    viewCount: readNumber(p, "viewCount") ?? 0,
+    最後動靜時間: readDateStart(p, "最後動靜時間"),
+    頻率: readNumber(p, "頻率"),
+    強度: readNumber(p, "強度"),
+  };
+}
+
+// 上區(最近的痕跡)候選:補充裁決05 §2.1 硬規則——查詢條件寫在 Notion filter
+// 裡,不是撈回來才篩。只取 traceLevel=daily 且未標記頻率/強度的候選(一標記
+// 就免淡,屬於下區,見補充裁決04 §2.2),且最後動靜時間落在查詢窗口內;是否
+// 真的「已淡」的 7 天門檻比較,交給呼叫端在讀到候選之後即時算(補充裁決04
+// §1.1,尚未實作,見本檔開頭註解)。
+export async function listRecentTraceCandidates() {
+  const cutoffISO = new Date(Date.now() - TRACE_QUERY_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const pages = await queryAll(DATA_SOURCES.DB19_生活痕跡庫, {
+    and: [
+      { property: "traceLevel", select: { equals: "daily" } },
+      { property: "頻率", number: { is_empty: true } },
+      { property: "強度", number: { is_empty: true } },
+      { property: "最後動靜時間", date: { on_or_after: cutoffISO } },
+    ],
+  });
+  return pages.map(mapTrace);
+}
+
+// 下區(留著的)候選:累積層/永久層痕跡,以及標記過頻率或強度的痕跡——四個
+// 條件用 or 併查,一次查詢就是最終候選集合,不在程式端另外過濾掉不該出現的
+// 項目,也不限張數(補充裁決04 §2.2)。
+export async function listPersistentTraces() {
+  const pages = await queryAll(DATA_SOURCES.DB19_生活痕跡庫, {
+    or: [
+      { property: "traceLevel", select: { equals: "accumulated" } },
+      { property: "traceLevel", select: { equals: "permanent" } },
+      { property: "頻率", number: { is_not_empty: true } },
+      { property: "強度", number: { is_not_empty: true } },
+    ],
+  });
+  return pages.map(mapTrace);
 }
 
 // --- DB-16 標籤詞庫:P3 比對結果顯示「命中標籤」名稱用 ---
