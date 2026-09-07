@@ -15,9 +15,13 @@ export type ContextPracticeSeed = {
   sourceText: string;
   originalSentence: string;
   correctedSentence: string;
-  status: "queued" | "used";
+  status: "queued" | "practicing" | "completed";
   createdAt: string;
-  usedAt: string | null;
+  practiceStartedAt: string | null;
+  practiceCompletedAt: string | null;
+  successSentence: string;
+  stuckPoint: string;
+  nextAdjustment: string;
 };
 
 function stringValue(value: unknown, fallback = ""): string {
@@ -40,13 +44,18 @@ export function contextSeedFromCandidate(candidate: EnglishContextCandidate, dat
     correctedSentence: candidate.correctedSentence,
     status: "queued",
     createdAt: new Date().toISOString(),
-    usedAt: null,
+    practiceStartedAt: null,
+    practiceCompletedAt: null,
+    successSentence: "",
+    stuckPoint: "",
+    nextAdjustment: "",
   };
 }
 
 export function normalizeContextPracticeSeed(value: unknown): ContextPracticeSeed | null {
   if (!value || typeof value !== "object") return null;
   const source = value as Partial<ContextPracticeSeed>;
+  const rawStatus = stringValue((value as Record<string, unknown>).status);
   const id = stringValue(source.id).slice(0, 220);
   const focus = stringValue(source.focus).slice(0, 500);
   const sourceDate = stringValue(source.sourceDate).slice(0, 10);
@@ -64,9 +73,23 @@ export function normalizeContextPracticeSeed(value: unknown): ContextPracticeSee
     sourceText: stringValue(source.sourceText).slice(0, 12000),
     originalSentence: stringValue(source.originalSentence).slice(0, 12000),
     correctedSentence: stringValue(source.correctedSentence).slice(0, 12000),
-    status: source.status === "used" ? "used" : "queued",
+    status: rawStatus === "completed" || rawStatus === "used"
+      ? "completed"
+      : rawStatus === "practicing"
+        ? "practicing"
+        : "queued",
     createdAt: stringValue(source.createdAt, new Date().toISOString()).slice(0, 80),
-    usedAt: typeof source.usedAt === "string" ? source.usedAt.slice(0, 80) : null,
+    practiceStartedAt: typeof source.practiceStartedAt === "string"
+      ? source.practiceStartedAt.slice(0, 80)
+      : null,
+    practiceCompletedAt: typeof source.practiceCompletedAt === "string"
+      ? source.practiceCompletedAt.slice(0, 80)
+      : typeof (source as { usedAt?: unknown }).usedAt === "string"
+        ? String((source as { usedAt?: unknown }).usedAt).slice(0, 80)
+        : null,
+    successSentence: stringValue(source.successSentence).slice(0, 4000),
+    stuckPoint: stringValue(source.stuckPoint).slice(0, 4000),
+    nextAdjustment: stringValue(source.nextAdjustment).slice(0, 4000),
   };
 }
 
