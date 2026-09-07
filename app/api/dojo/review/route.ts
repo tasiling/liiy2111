@@ -14,7 +14,12 @@ import {
 } from "@/lib/notion/queries";
 import { CLOSING_TITLE_PREFIX } from "@/lib/notion/schema";
 import { SPACE_TO_SOURCE_TYPE, SPACES, type DojoEntry, type SpaceKey } from "@/lib/dojo/constants";
-import { MANIFESTATION_MILESTONE_TITLE_PREFIX, normalizeManifestationMilestone } from "@/lib/dojo/manifestation";
+import {
+  CREATIVE_PRACTICE_TITLE_PREFIX,
+  MANIFESTATION_MILESTONE_TITLE_PREFIX,
+  normalizeCreativePractice,
+  normalizeManifestationMilestone,
+} from "@/lib/dojo/manifestation";
 
 export const dynamic = "force-dynamic";
 
@@ -25,13 +30,14 @@ function titleDate(title: string): string | null {
 
 export async function GET() {
   try {
-    const [entryRows, dailyRows, traces, journals, legacyClosingRows, milestoneRows] = await Promise.all([
+    const [entryRows, dailyRows, traces, journals, legacyClosingRows, milestoneRows, creativePracticeRows] = await Promise.all([
       listJsonRecords(ENTRY_TITLE_PREFIX),
       listJsonRecords(DAILY_TITLE_PREFIX),
       listAllTraceEntries(),
       listAllJournalEntries(),
       listKnowledgeEntriesByPrefix(CLOSING_TITLE_PREFIX),
       listJsonRecords(MANIFESTATION_MILESTONE_TITLE_PREFIX),
+      listJsonRecords(CREATIVE_PRACTICE_TITLE_PREFIX),
     ]);
 
     const entries = entryRows
@@ -97,12 +103,21 @@ export async function GET() {
       .filter((item): item is NonNullable<typeof item> => item !== null)
       .sort((a, b) => (b.date + b.createdAt).localeCompare(a.date + a.createdAt));
 
+    const creativePractices = creativePracticeRows
+      .map((row) => normalizeCreativePractice(row.value, {
+        id: row.id,
+        practicedOn: titleDate(row.title) ?? "",
+      }))
+      .filter((item): item is NonNullable<typeof item> => item !== null)
+      .sort((a, b) => (b.practicedOn + b.createdAt).localeCompare(a.practicedOn + a.createdAt));
+
     return NextResponse.json({
       entries: [...entries, ...legacy].sort((a, b) => (b.createdAt ?? b.date).localeCompare(a.createdAt ?? a.date)),
       daily,
       journals: historicalJournals,
       legacyClosings,
       milestones,
+      creativePractices,
     });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });

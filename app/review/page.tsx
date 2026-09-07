@@ -18,7 +18,7 @@ import { combineJournalTexts, formatDailyJournalText, type JournalExportMode } f
 import { formatFreqIntensityLabel, resolveHawkinsLevel } from "@/lib/dojo/hawkins";
 import { useDojo } from "@/lib/dojo/store";
 import { JOURNAL_QUESTIONS, type JournalQuestionKey } from "@/lib/journal/notionFormat";
-import type { ManifestationMilestone } from "@/lib/dojo/manifestation";
+import type { CreativePracticeRecord, ManifestationMilestone } from "@/lib/dojo/manifestation";
 
 const TASK_ORDER: DailyTaskCategory[] = ["important", "hobby", "health"];
 const EVENING_DISPOSITION_LABELS = {
@@ -55,6 +55,13 @@ function fmtDate(dateISO: string) {
     .format(new Date(`${dateISO}T12:00:00+08:00`));
 }
 
+function fmtDuration(seconds: number) {
+  if (seconds < 60) return `${seconds} 秒`;
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds % 60;
+  return rest ? `${minutes} 分 ${rest} 秒` : `${minutes} 分`;
+}
+
 function downloadText(filename: string, content: string) {
   const blob = new Blob(["\uFEFF", content], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -74,6 +81,7 @@ export default function ReviewPage() {
   const [journals, setJournals] = useState<HistoricalJournal[]>([]);
   const [legacyClosings, setLegacyClosings] = useState<LegacyClosing[]>([]);
   const [milestones, setMilestones] = useState<ManifestationMilestone[]>([]);
+  const [creativePractices, setCreativePractices] = useState<CreativePracticeRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -102,6 +110,7 @@ export default function ReviewPage() {
           journals: HistoricalJournal[];
           legacyClosings: LegacyClosing[];
           milestones: ManifestationMilestone[];
+          creativePractices: CreativePracticeRecord[];
         }>(response);
         if (!cancelled) {
           setDaily(json.daily ?? []);
@@ -109,6 +118,7 @@ export default function ReviewPage() {
           setJournals(json.journals ?? []);
           setLegacyClosings(json.legacyClosings ?? []);
           setMilestones(json.milestones ?? []);
+          setCreativePractices(json.creativePractices ?? []);
         }
       } catch (caught) {
         if (!cancelled) setError(caught instanceof Error ? caught.message : String(caught));
@@ -138,13 +148,19 @@ export default function ReviewPage() {
     for (const item of milestones) map.set(item.date, [...(map.get(item.date) ?? []), item]);
     return map;
   }, [milestones]);
+  const creativePracticesByDate = useMemo(() => {
+    const map = new Map<string, CreativePracticeRecord[]>();
+    for (const item of creativePractices) map.set(item.practicedOn, [...(map.get(item.practicedOn) ?? []), item]);
+    return map;
+  }, [creativePractices]);
 
   const allReviewDates = useMemo(() => [...new Set([
     ...daily.map((record) => record.date),
     ...journals.map((journal) => journal.date),
     ...legacyClosings.map((closing) => closing.date),
     ...milestones.map((item) => item.date),
-  ])].sort((a, b) => b.localeCompare(a)), [daily, journals, legacyClosings, milestones]);
+    ...creativePractices.map((item) => item.practicedOn),
+  ])].sort((a, b) => b.localeCompare(a)), [creativePractices, daily, journals, legacyClosings, milestones]);
 
   const normalizedQuery = query.trim().toLocaleLowerCase("zh-Hant");
   const visibleReviewDates = useMemo(() => {
@@ -172,10 +188,13 @@ export default function ReviewPage() {
         ...(journalsByDate.get(date) ?? []).flatMap((journal) => Object.values(journal.answers)),
         ...(legacyClosingsByDate.get(date) ?? []).flatMap((closing) => [closing.title, closing.note]),
         ...(milestonesByDate.get(date) ?? []).flatMap((item) => [item.action, item.response, item.trait, item.reflection]),
+        ...(creativePracticesByDate.get(date) ?? []).flatMap((item) => item.method === "affirm"
+          ? [...item.statements, item.feeling, item.roleSnapshot.title, ...item.roleSnapshot.traits]
+          : [item.scene, item.sourceLabel, item.sensoryDetails, item.bodyFeeling]),
       ].filter(Boolean).join(" ").toLocaleLowerCase("zh-Hant");
       return text.includes(normalizedQuery);
     });
-  }, [allReviewDates, dailyByDate, dateFilter, journalsByDate, legacyClosingsByDate, milestonesByDate, normalizedQuery]);
+  }, [allReviewDates, creativePracticesByDate, dailyByDate, dateFilter, journalsByDate, legacyClosingsByDate, milestonesByDate, normalizedQuery]);
 
   const visibleEntries = useMemo(() => entries.filter((entry) => {
     if (dateFilter && entry.date !== dateFilter) return false;
@@ -262,6 +281,7 @@ export default function ReviewPage() {
               journals={journalsByDate.get(date) ?? []}
               legacyClosings={legacyClosingsByDate.get(date) ?? []}
               milestones={milestonesByDate.get(date) ?? []}
+              creativePractices={creativePracticesByDate.get(date) ?? []}
             />
           ))}
           {visibleReviewDates.length === 0 && mode === "daily" && <div className="empty">這個條件下沒有日期回看。</div>}
@@ -298,12 +318,14 @@ function DailyReviewCard({
   journals,
   legacyClosings,
   milestones,
+  creativePractices,
 }: {
   date: string;
   record?: DailyRecord;
   journals: HistoricalJournal[];
   legacyClosings: LegacyClosing[];
   milestones: ManifestationMilestone[];
+  creativePractices: CreativePracticeRecord[];
 }) {
   const [englishStatus, setEnglishStatus] = useState<"idle" | "sending" | "sent">("idle");
   const [englishError, setEnglishError] = useState<string | null>(null);
@@ -326,6 +348,8 @@ function DailyReviewCard({
     ? `${completed}/3 · ${hasEvening ? "已收光" : "未收光"}`
     : milestones.length
       ? `創現里程碑 · ${milestones.length} 則`
+      : creativePractices.length
+        ? `創現修習 · ${creativePractices.length} 回`
       : `舊資料 · ${oldAnswers.length ? "有舊筆記" : "有收光處置"}`;
 
   function exportDay(mode: JournalExportMode) {
@@ -357,7 +381,7 @@ function DailyReviewCard({
       <summary>
         <div>
           <span className="eyebrow">{fmtDate(date)}</span>
-          <b>{record?.morning.intention || milestones[0]?.action || (oldAnswers.length ? "這一天留有舊版筆記" : "這一天留下了一段紀錄")}</b>
+          <b>{record?.morning.intention || milestones[0]?.action || (creativePractices[0]?.method === "affirm" ? "完成一次狂A肯定句" : creativePractices[0]?.method === "vision" ? creativePractices[0].scene : "") || (oldAnswers.length ? "這一天留有舊版筆記" : "這一天留下了一段紀錄")}</b>
         </div>
         <span>{summaryStatus}</span>
       </summary>
@@ -379,6 +403,8 @@ function DailyReviewCard({
         {(record?.morning.intention || record?.morning.creativeState) && <><h3>晨間創作{morningDepthLabel ? ` · ${morningDepthLabel}` : ""}</h3><div className="review-note-stack">{record.morning.creativeState && <p><b>今天決定創作的狀態</b>{record.morning.creativeState}</p>}{record.morning.intention && <p><b>今日抉擇</b>{record.morning.intention}</p>}</div></>}
 
         {milestones.length > 0 && <><h3>創現里程碑</h3><div className="review-milestones">{milestones.map((item) => <article key={item.id}><small>{item.trait}</small><b>{item.action}</b>{item.response && <p>現實回應：{item.response}</p>}{item.reflection && <p>這段進度：{item.reflection}</p>}</article>)}</div></>}
+
+        {creativePractices.length > 0 && <><h3>創現修習</h3><div className="review-creative-practices">{creativePractices.map((item) => item.method === "affirm" ? <article key={item.id} className="affirm"><small>Affirm・狂A肯定句・{fmtDuration(item.durationSeconds)}{item.repetitionCount ? `・${item.repetitionCount} 次` : ""}</small>{item.statements.map((statement) => <b key={statement}>{statement}</b>)}{item.feeling && <p>複誦後：{item.feeling}</p>}</article> : <article key={item.id} className="vision"><small>Vision・視覺化沉浸・{fmtDuration(item.durationSeconds)}</small><b>{item.scene}</b>{item.sourceLabel && <p>取材：{item.sourceLabel}</p>}{item.sensoryDetails && <p>感官細節：{item.sensoryDetails}</p>}{item.bodyFeeling && <p>身體感受：{item.bodyFeeling}</p>}</article>)}</div></>}
 
         {hasMorningNotes && (
           <>

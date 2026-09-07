@@ -484,6 +484,7 @@ export default function TodayPage() {
                   }))}
                   placeholder={'寫 1–3 句即可，例如：「我今天決定讓穩定成為我的行動方式。」'}
                 />
+                <small className="field-help">這裡只需要寫一次，作為今天的意識錨定；專注重複複誦請到修習所的「狂A肯定句」。</small>
               </section>
             )}
             {record.morning.depth === "deep" && (

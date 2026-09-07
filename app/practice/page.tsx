@@ -20,6 +20,7 @@ import { useDojo } from "@/lib/dojo/store";
 import { GUANGXING, GUANGFA, type GuangxingKey, type GuangfaKey } from "@/lib/dojo/constants";
 import LearningPaths from "../components/LearningPaths";
 import CreativeRoleStudio from "../components/CreativeRoleStudio";
+import VisionPractice from "../components/VisionPractice";
 
 type Tab = "body" | "mind" | "spirit" | "guangxing" | "guangfa" | "logs";
 const TABS: { key: Tab; label: string }[] = [
@@ -35,6 +36,10 @@ export default function PracticePage() {
   const [tab, setTab] = useState<Tab>("body");
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    if (params.get("vision")) {
+      const timer = window.setTimeout(() => setTab("spirit"), 0);
+      return () => window.clearTimeout(timer);
+    }
     if (!params.get("journal") && !params.get("manifestation")) return;
     const timer = window.setTimeout(() => setTab("mind"), 0);
     return () => window.clearTimeout(timer);
@@ -163,6 +168,7 @@ function SpiritTab() {
         <b>回到更深的連結。</b>
         <small>冥想、祈願、儀式、與宇宙對話的片刻。</small>
       </div>
+      <VisionPractice />
       <button className="primary" onClick={() => openQuickAdd({ presetSpace: "practice", presetKind: "靈" })}>
         留下靈修紀錄
       </button>

@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import type { CreativeRoleProfile, ManifestationMilestone } from "@/lib/dojo/manifestation";
+import AffirmPractice from "./AffirmPractice";
 
 async function readResponse<T>(response: Response): Promise<T> {
   const json = await response.json().catch(() => ({}));
@@ -70,6 +72,13 @@ export default function CreativeRoleStudio() {
       <span className="label">創作者原則</span>
       <b>創現，是主動寫出選擇與行動。</b>
       <p>你是創作者；如實承認此刻，再決定要營造的狀態。外界回應會被記下，但不必宣稱自己控制所有結果。</p>
+      <div className="creative-role-pair"><span><b>現世角色</b>今天主筆創作的你</span><span><b>創現角色</b>正在被你持續寫出的版本</span></div>
+    </section>
+
+    <section className="creative-method-map" aria-label="三種創作方式">
+      <span><b>劇本法</b>角色與行動證據</span>
+      <span><b>Affirm</b>專注複誦</span>
+      <Link href="/practice?vision=1"><b>Vision</b>前往沉浸練習 →</Link>
     </section>
 
     <section className="creative-role-card">
@@ -86,7 +95,7 @@ export default function CreativeRoleStudio() {
 
     <section className="creative-milestone-card">
       <div className="section-heading"><div><span className="eyebrow">主動創造的證據</span><h3>里程碑事件</h3></div></div>
-      <label htmlFor="creative-action">我主動寫下了什麼行動？</label>
+      <label htmlFor="creative-action">我主動採取了什麼行動？</label>
       <textarea id="creative-action" className="field" rows={3} value={action} onChange={(event) => setAction(event.target.value)} placeholder="例如：我安排並完成了一次看房。" />
       <label htmlFor="creative-response">現實給了什麼回應？（選填）</label>
       <textarea id="creative-response" className="field" rows={2} value={response} onChange={(event) => setResponse(event.target.value)} placeholder="只寫實際發生的回應，不需要把外界結果都歸因於自己。" />
@@ -96,6 +105,7 @@ export default function CreativeRoleStudio() {
       <textarea id="creative-reflection" className="field" rows={2} value={reflection} onChange={(event) => setReflection(event.target.value)} />
       <button type="button" className="primary" disabled={saving || !action.trim() || !trait.trim()} onClick={() => void saveMilestone()}>{saving ? "保存中…" : "留下里程碑"}</button>
     </section>
+    <AffirmPractice profile={profile} />
     {error && <p className="form-error">{error}</p>}{message && <p className="save-notice">{message}</p>}
     {milestones.length > 0 && <details className="creative-milestone-history"><summary>最近的里程碑（{milestones.length}）</summary>{milestones.slice(0, 6).map((item) => <article key={item.id}><small>{item.date} · {item.trait}</small><b>{item.action}</b>{item.response && <p>現實回應：{item.response}</p>}</article>)}</details>}
   </div>;

@@ -3384,8 +3384,16 @@
 .dojo .creative-principle-card .label { color: #9a722e; }
 .dojo .creative-principle-card b { display: block; margin: 5px 0; font: 650 16px "Noto Serif TC", serif; }
 .dojo .creative-principle-card p { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.65; }
+.dojo .creative-role-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 10px; }
+.dojo .creative-role-pair span { padding: 8px; border: 1px solid #dfd1b4; border-radius: 10px; background: rgba(255,255,255,.55); color: var(--muted); font-size: 8.5px; line-height: 1.45; }
+.dojo .creative-role-pair b { margin: 0 0 2px; color: var(--ink); font-size: 9.5px; font-weight: 800; line-height: 1.3; }
+.dojo .creative-method-map { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.dojo .creative-method-map span,
+.dojo .creative-method-map a { min-width: 0; padding: 8px 6px; border: 1px solid #ddd0b5; border-radius: 11px; background: #fffdf8; color: var(--muted); font-size: 7.8px; line-height: 1.4; text-decoration: none; }
+.dojo .creative-method-map b { display: block; margin-bottom: 2px; color: #80642f; font-size: 9px; }
 .dojo .creative-role-card h3,
-.dojo .creative-milestone-card h3 { margin: 2px 0 0; font-size: 17px; }
+.dojo .creative-milestone-card h3,
+.dojo .creative-practice-card h3 { margin: 2px 0 0; font-size: 17px; }
 .dojo .creative-role-card > label,
 .dojo .creative-milestone-card > label { display: block; margin: 11px 0 5px; font-size: 10px; font-weight: 800; }
 .dojo .creative-role-card > .field,
@@ -3402,6 +3410,43 @@
 .dojo .creative-milestone-history b { margin-top: 3px; font-size: 10px; line-height: 1.5; }
 .dojo .creative-milestone-history p { margin: 4px 0 0; color: var(--muted); font-size: 9px; }
 .dojo .creative-role-loading { margin-top: 12px; }
+.dojo .creative-practice-card { padding: 14px; border: 1px solid #c8d2c1; border-radius: 16px; background: linear-gradient(145deg, #fbfdf9, #edf2e9); }
+.dojo .creative-practice-card.vision-practice { margin-top: 12px; border-color: #c7c5db; background: linear-gradient(145deg, #fbfafc, #eeedf5); }
+.dojo .creative-practice-card .section-heading { align-items: flex-start; }
+.dojo .creative-practice-card .section-heading > small { max-width: 88px; color: var(--muted); font-size: 7.5px; line-height: 1.4; text-align: right; }
+.dojo .creative-practice-intro { margin: 7px 0 9px; color: var(--muted); font-size: 9px; line-height: 1.6; }
+.dojo .practice-moment-list { margin: 8px 0 11px; padding: 0 9px; border: 1px dashed #c9c3b4; border-radius: 10px; background: rgba(255,255,255,.55); }
+.dojo .practice-moment-list summary { padding: 8px 0; color: #76633e; cursor: pointer; font-size: 8.5px; font-weight: 800; }
+.dojo .practice-moment-list ul { margin: 0 0 9px; padding-left: 16px; color: var(--muted); font-size: 8px; line-height: 1.65; }
+.dojo .creative-practice-card > label,
+.dojo .creative-practice-reflection label { display: block; margin: 10px 0 5px; font-size: 9px; font-weight: 800; }
+.dojo .creative-practice-card > .field,
+.dojo .creative-practice-reflection .field { margin: 0; background: rgba(255,255,255,.84); }
+.dojo .creative-practice-card > .primary { width: 100%; margin-top: 11px; }
+.dojo .creative-practice-card > .ghost.compact { width: 100%; margin-top: 7px; padding: 7px; font-size: 8.5px; }
+.dojo .creative-practice-card .field-help { display: block; margin-top: 5px; color: var(--muted); font-size: 8px; line-height: 1.45; }
+.dojo .creative-focus-stage { padding: 13px; border: 1px solid #b6c3af; border-radius: 14px; background: rgba(255,255,255,.72); text-align: center; }
+.dojo .creative-focus-stage .focus-clock { display: block; color: #536a59; font: 700 30px/1.2 ui-monospace, monospace; }
+.dojo .focus-statements { margin: 12px 0; }
+.dojo .focus-statements p { margin: 8px 0; font: 650 13px/1.7 "Noto Serif TC", serif; }
+.dojo .affirm-count { display: grid; width: 100%; min-height: 58px; margin: 10px 0; place-items: center; border-color: #aebeaa; background: #eef4eb; }
+.dojo .affirm-count b { font-size: 17px; }
+.dojo .affirm-count span { color: var(--muted); font-size: 8px; }
+.dojo .creative-focus-stage .two,
+.dojo .creative-practice-reflection .two { margin-top: 11px; }
+.dojo .creative-practice-reflection > p { margin: 0 0 7px; color: #667061; font-size: 9px; font-weight: 800; }
+.dojo .vision-source-note { margin: 5px 0 0; padding: 7px; border-radius: 8px; background: rgba(255,255,255,.62); color: var(--muted); font-size: 8px; line-height: 1.45; }
+.dojo .vision-focus > small { display: block; margin-top: 10px; color: #747088; font-size: 8px; }
+.dojo .vision-scene { margin: 7px 0 14px; font: 650 12px/1.7 "Noto Serif TC", serif; white-space: pre-wrap; }
+.dojo .review-creative-practices { display: grid; gap: 8px; }
+.dojo .review-creative-practices article { padding: 10px; border-left: 3px solid #708875; border-radius: 10px; background: #f2f6ef; }
+.dojo .review-creative-practices article.vision { border-color: #7a7694; background: #f2f1f7; }
+.dojo .review-creative-practices small,
+.dojo .review-creative-practices b { display: block; }
+.dojo .review-creative-practices small { margin-bottom: 4px; color: #657269; font-size: 8px; font-weight: 800; }
+.dojo .review-creative-practices b { font-size: 10px; line-height: 1.55; }
+.dojo .review-creative-practices b + b { margin-top: 4px; }
+.dojo .review-creative-practices p { margin: 5px 0 0; color: var(--muted); font-size: 9px; line-height: 1.5; }
 .dojo .morning-creative-anchor { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 11px 0; padding: 10px; border: 1px solid #dbc99f; border-radius: 12px; background: #fff9eb; }
 .dojo .morning-creative-anchor small,
 .dojo .morning-creative-anchor b,
@@ -3432,6 +3477,7 @@
 
 @media (max-width: 390px) {
   .dojo .evening-milestone-capture summary { align-items: flex-start; flex-direction: column; }
+  .dojo .creative-practice-card .section-heading { gap: 6px; }
 }
 
 /* 修習所・英文：獨立語境修習室入口與手動成果接收。只保存精簡回傳摘要，
