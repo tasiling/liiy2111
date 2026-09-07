@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import EntryMeasurePanel from "@/app/components/EntryMeasurePanel";
+import ManifestationMilestoneCapture from "@/app/components/ManifestationMilestoneCapture";
 import { carryDateOptions, fmtDateWD } from "@/lib/closing/notionFormat";
 import { SPACES, type SpaceKey } from "@/lib/dojo/constants";
 import type { PersonalContinuation } from "@/lib/dojo/continuations";
@@ -18,6 +19,7 @@ import {
   type WeeklyBoard,
 } from "@/lib/dojo/formal";
 import { useDojo } from "@/lib/dojo/store";
+import type { CreativeRoleProfile } from "@/lib/dojo/manifestation";
 
 const TASK_ORDER: DailyTaskCategory[] = ["important", "hobby", "health"];
 const EVENING_FIELDS = {
@@ -82,6 +84,7 @@ export default function TodayPage() {
   const [eveningFeedback, setEveningFeedback] = useState<string | null>(null);
   const [logText, setLogText] = useState("");
   const [readingVisitCount, setReadingVisitCount] = useState(0);
+  const [creativeRole, setCreativeRole] = useState<CreativeRoleProfile | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -134,6 +137,15 @@ export default function TodayPage() {
       }
     }
     void loadReadingVisits();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/dojo/manifestation", { cache: "no-store" })
+      .then((response) => readResponse<{ profile: CreativeRoleProfile }>(response))
+      .then(({ profile }) => { if (!cancelled) setCreativeRole(profile); })
+      .catch(() => { /* 創現角色是選用功能，不阻擋今天頁。 */ });
     return () => { cancelled = true; };
   }, []);
 
@@ -420,13 +432,28 @@ export default function TodayPage() {
               ))}
             </div>
 
-            <label htmlFor="morning-intention">今天想把光放在哪裡？</label>
+            {creativeRole?.title ? <div className="morning-creative-anchor">
+              <div><small>你正在創作</small><b>{creativeRole.title}</b><span>{creativeRole.traits.join("・")}</span></div>
+              <Link href="/practice?manifestation=1">調整角色</Link>
+            </div> : <Link className="morning-creative-setup" href="/practice?manifestation=1">先建立創現角色小檔案 →</Link>}
+
+            <label htmlFor="morning-creative-state">今天決定創作什麼狀態？</label>
+            <textarea
+              id="morning-creative-state"
+              className="field"
+              value={record.morning.creativeState}
+              onChange={(event) => setRecord({ ...record, morning: { ...record.morning, creativeState: event.target.value } })}
+              placeholder="例如：我決定營造步調放慢、仍能完成一件重要小事的狀態。"
+            />
+            <small className="field-help">如實看見現在，再選擇今天想往哪個狀態靠近。</small>
+
+            <label htmlFor="morning-intention">今日抉擇</label>
             <textarea
               id="morning-intention"
               className="field"
               value={record.morning.intention}
               onChange={(event) => setRecord({ ...record, morning: { ...record.morning, intention: event.target.value } })}
-              placeholder="一句今天的方向即可"
+              placeholder="為了創作這個版本的自己，今天要做哪個具體選擇？"
             />
 
             {(record.morning.depth === "medium" || record.morning.depth === "deep") && (
@@ -455,7 +482,7 @@ export default function TodayPage() {
                     ...current,
                     morning: { ...current.morning, affirmation: event.target.value },
                   }))}
-                  placeholder="今天想對自己說的一句話"
+                  placeholder={'寫 1–3 句即可，例如：「我今天決定讓穩定成為我的行動方式。」'}
                 />
               </section>
             )}
@@ -474,7 +501,7 @@ export default function TodayPage() {
                     ...current,
                     morning: { ...current.morning, futureJournal: event.target.value },
                   }))}
-                  placeholder="用已經發生的語氣，寫下想走向的畫面。"
+                  placeholder="用創作者視角，寫下你決定如何讓下一段生活發生。"
                 />
               </section>
             )}
@@ -665,6 +692,7 @@ export default function TodayPage() {
 
             {!eveningFeedback && record.evening.disposition === "journal" && (
               <div className="closing-flow-panel journal" aria-live="polite">
+                <ManifestationMilestoneCapture date={date} />
                 <label>今天想回看到多深？</label>
                 <div className="segmented three evening-depth-picker">
                   {([

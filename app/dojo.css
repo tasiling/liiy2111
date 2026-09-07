@@ -3370,6 +3370,70 @@
 .dojo .learning-material small { max-height: 3em; overflow: hidden; margin-top: 3px; color: var(--muted); font-size: 9.5px; line-height: 1.5; }
 .dojo .learning-material a { flex: 0 0 auto; color: var(--track-color); font-size: 9.5px; }
 
+/* 修習所・心・意：雙角色創現書寫。角色設定低頻更新，里程碑與每日紀錄分開保存。 */
+.dojo .creative-role-studio { display: grid; gap: 12px; margin-top: 12px; }
+.dojo .creative-principle-card,
+.dojo .creative-role-card,
+.dojo .creative-milestone-card {
+  padding: 14px;
+  border: 1px solid #d8c9a7;
+  border-radius: 16px;
+  background: #fffaf0;
+}
+.dojo .creative-principle-card { background: linear-gradient(145deg, #fff8e9, #f2ead7); }
+.dojo .creative-principle-card .label { color: #9a722e; }
+.dojo .creative-principle-card b { display: block; margin: 5px 0; font: 650 16px "Noto Serif TC", serif; }
+.dojo .creative-principle-card p { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.65; }
+.dojo .creative-role-card h3,
+.dojo .creative-milestone-card h3 { margin: 2px 0 0; font-size: 17px; }
+.dojo .creative-role-card > label,
+.dojo .creative-milestone-card > label { display: block; margin: 11px 0 5px; font-size: 10px; font-weight: 800; }
+.dojo .creative-role-card > .field,
+.dojo .creative-milestone-card > .field { margin: 0; background: #fff; }
+.dojo .creative-role-card > small { display: block; margin-top: 5px; color: var(--muted); font-size: 8.5px; line-height: 1.5; }
+.dojo .creative-role-card > .primary,
+.dojo .creative-milestone-card > .primary { width: 100%; margin-top: 12px; }
+.dojo .creative-milestone-history { padding: 0 12px; border: 1px solid #dfd3ba; border-radius: 14px; background: #fffdf8; }
+.dojo .creative-milestone-history summary { padding: 11px 0; color: #80642f; cursor: pointer; font-size: 10px; font-weight: 800; }
+.dojo .creative-milestone-history article { padding: 9px 0; border-top: 1px dashed #ddd0b6; }
+.dojo .creative-milestone-history small,
+.dojo .creative-milestone-history b { display: block; }
+.dojo .creative-milestone-history small { color: #9a8258; font-size: 8px; }
+.dojo .creative-milestone-history b { margin-top: 3px; font-size: 10px; line-height: 1.5; }
+.dojo .creative-milestone-history p { margin: 4px 0 0; color: var(--muted); font-size: 9px; }
+.dojo .creative-role-loading { margin-top: 12px; }
+.dojo .morning-creative-anchor { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 11px 0; padding: 10px; border: 1px solid #dbc99f; border-radius: 12px; background: #fff9eb; }
+.dojo .morning-creative-anchor small,
+.dojo .morning-creative-anchor b,
+.dojo .morning-creative-anchor span { display: block; }
+.dojo .morning-creative-anchor small { color: #9a722e; font-size: 8px; }
+.dojo .morning-creative-anchor b { margin: 2px 0; font-size: 10.5px; }
+.dojo .morning-creative-anchor span { color: var(--muted); font-size: 8.5px; }
+.dojo .morning-creative-anchor a,
+.dojo .morning-creative-setup { color: #83611f; font-size: 9px; font-weight: 800; text-decoration: none; }
+.dojo .morning-creative-setup { display: block; margin: 10px 0; padding: 9px; border: 1px dashed #d7c49a; border-radius: 10px; background: #fffbf2; text-align: center; }
+
+.dojo .evening-milestone-capture { margin-bottom: 14px; border: 1px solid #d7c39b; border-radius: 13px; background: #fff9ed; }
+.dojo .evening-milestone-capture summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 11px; cursor: pointer; }
+.dojo .evening-milestone-capture summary span { font-size: 10px; font-weight: 800; }
+.dojo .evening-milestone-capture summary small { color: var(--muted); font-size: 8px; }
+.dojo .evening-milestone-capture > div { padding: 0 11px 11px; border-top: 1px solid #eadfc8; }
+.dojo .evening-milestone-capture p { margin: 9px 0; color: var(--muted); font-size: 9px; line-height: 1.5; }
+.dojo .evening-milestone-capture label { display: block; margin: 9px 0 4px; font-size: 9px; font-weight: 800; }
+.dojo .evening-milestone-capture .field { margin: 0; background: #fff; }
+.dojo .evening-milestone-capture button { width: 100%; margin-top: 10px; }
+.dojo .review-milestones { display: grid; gap: 8px; }
+.dojo .review-milestones article { padding: 10px; border-left: 3px solid #c69b49; border-radius: 10px; background: #fff8e9; }
+.dojo .review-milestones small,
+.dojo .review-milestones b { display: block; }
+.dojo .review-milestones small { color: #9a722e; font-size: 8px; font-weight: 800; }
+.dojo .review-milestones b { margin-top: 3px; font-size: 10.5px; line-height: 1.5; }
+.dojo .review-milestones p { margin: 5px 0 0; color: var(--muted); font-size: 9px; line-height: 1.5; }
+
+@media (max-width: 390px) {
+  .dojo .evening-milestone-capture summary { align-items: flex-start; flex-direction: column; }
+}
+
 /* 修習所・英文：獨立語境修習室入口與手動成果接收。只保存精簡回傳摘要，
    不在行光道場複製練習介面。 */
 .dojo .context-room-bridge {

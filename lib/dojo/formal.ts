@@ -13,6 +13,7 @@ import {
 } from "./constants";
 import { ENGLISH_JOURNAL_TITLE_PREFIX } from "./englishJournal";
 import { CONTEXT_ROOM_RESULT_TITLE_PREFIX } from "./contextRoomResult";
+import { CREATIVE_ROLE_TITLE, MANIFESTATION_MILESTONE_TITLE_PREFIX } from "./manifestation";
 
 export { ENGLISH_JOURNAL_TITLE_PREFIX };
 export { CONTEXT_ROOM_RESULT_TITLE_PREFIX };
@@ -34,6 +35,8 @@ export const FORMAL_STATE_TITLE_PREFIXES = [
   WEAVING_PROJECT_TITLE_PREFIX,
   ENGLISH_JOURNAL_TITLE_PREFIX,
   CONTEXT_ROOM_RESULT_TITLE_PREFIX,
+  CREATIVE_ROLE_TITLE,
+  MANIFESTATION_MILESTONE_TITLE_PREFIX,
 ] as const;
 
 export const TAIPEI_TIME_ZONE = "Asia/Taipei";
@@ -82,6 +85,7 @@ export type DailyRecord = {
     depth: MorningDepth | null;
     intention: string;
     state: "低" | "穩" | "亮" | null;
+    creativeState: string;
     gratitude: string;
     affirmation: string;
     futureJournal: string;
@@ -361,6 +365,7 @@ export function emptyDailyRecord(date = taipeiTodayISO()): DailyRecord {
       depth: null,
       intention: "",
       state: null,
+      creativeState: "",
       gratitude: "",
       affirmation: "",
       futureJournal: "",
@@ -463,6 +468,7 @@ export function normalizeDailyRecord(value: unknown, expectedDate: string): Dail
       depth: explicitMorningDepth ?? legacyMorningDepth,
       intention: stringValue(morning.intention).slice(0, 1000),
       state,
+      creativeState: stringValue(morning.creativeState).slice(0, 1000),
       gratitude: stringValue(morning.gratitude).slice(0, 3000),
       affirmation: stringValue(morning.affirmation).slice(0, 2000),
       futureJournal: stringValue(morning.futureJournal).slice(0, 5000),

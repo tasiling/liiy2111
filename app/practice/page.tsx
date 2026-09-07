@@ -19,6 +19,7 @@ import { useEffect, useState } from "react";
 import { useDojo } from "@/lib/dojo/store";
 import { GUANGXING, GUANGFA, type GuangxingKey, type GuangfaKey } from "@/lib/dojo/constants";
 import LearningPaths from "../components/LearningPaths";
+import CreativeRoleStudio from "../components/CreativeRoleStudio";
 
 type Tab = "body" | "mind" | "spirit" | "guangxing" | "guangfa" | "logs";
 const TABS: { key: Tab; label: string }[] = [
@@ -33,7 +34,8 @@ const TABS: { key: Tab; label: string }[] = [
 export default function PracticePage() {
   const [tab, setTab] = useState<Tab>("body");
   useEffect(() => {
-    if (!new URLSearchParams(window.location.search).get("journal")) return;
+    const params = new URLSearchParams(window.location.search);
+    if (!params.get("journal") && !params.get("manifestation")) return;
     const timer = window.setTimeout(() => setTab("mind"), 0);
     return () => window.clearTimeout(timer);
   }, []);
@@ -110,6 +112,11 @@ function MindTab() {
   const router = useRouter();
   const { openQuickAdd, startTimerWith } = useDojo();
   const [sub, setSub] = useState<MindSub>("知");
+  useEffect(() => {
+    if (!new URLSearchParams(window.location.search).get("manifestation")) return;
+    const timer = window.setTimeout(() => setSub("意"), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
   // 知/情/意沒有明確對應的光行／光法項目,維持不特別標記(理由同身)。
   function startHere() {
     startTimerWith({ space: "practice", title: `心・${sub}`, kind: `心／${sub}` });
@@ -124,7 +131,7 @@ function MindTab() {
           </button>
         ))}
       </div>
-      {sub === "知" ? <LearningPaths /> : <>
+      {sub === "知" ? <LearningPaths /> : sub === "意" ? <CreativeRoleStudio /> : <>
         <div className="card">
           <span className="label">心・{sub}</span>
           <b>覺察此刻的心。</b>

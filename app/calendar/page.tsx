@@ -121,6 +121,7 @@ function hasDailyActivity(record?: DailyRecord) {
   return Boolean(
     record.morning.startedAt ||
     record.morning.intention.trim() ||
+    record.morning.creativeState.trim() ||
     record.morning.gratitude.trim() ||
     record.morning.affirmation.trim() ||
     record.morning.futureJournal.trim() ||

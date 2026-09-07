@@ -18,6 +18,7 @@ import { combineJournalTexts, formatDailyJournalText, type JournalExportMode } f
 import { formatFreqIntensityLabel, resolveHawkinsLevel } from "@/lib/dojo/hawkins";
 import { useDojo } from "@/lib/dojo/store";
 import { JOURNAL_QUESTIONS, type JournalQuestionKey } from "@/lib/journal/notionFormat";
+import type { ManifestationMilestone } from "@/lib/dojo/manifestation";
 
 const TASK_ORDER: DailyTaskCategory[] = ["important", "hobby", "health"];
 const EVENING_DISPOSITION_LABELS = {
@@ -72,6 +73,7 @@ export default function ReviewPage() {
   const [entries, setEntries] = useState<DojoEntry[]>([]);
   const [journals, setJournals] = useState<HistoricalJournal[]>([]);
   const [legacyClosings, setLegacyClosings] = useState<LegacyClosing[]>([]);
+  const [milestones, setMilestones] = useState<ManifestationMilestone[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -99,12 +101,14 @@ export default function ReviewPage() {
           entries: DojoEntry[];
           journals: HistoricalJournal[];
           legacyClosings: LegacyClosing[];
+          milestones: ManifestationMilestone[];
         }>(response);
         if (!cancelled) {
           setDaily(json.daily ?? []);
           setEntries(json.entries ?? []);
           setJournals(json.journals ?? []);
           setLegacyClosings(json.legacyClosings ?? []);
+          setMilestones(json.milestones ?? []);
         }
       } catch (caught) {
         if (!cancelled) setError(caught instanceof Error ? caught.message : String(caught));
@@ -129,12 +133,18 @@ export default function ReviewPage() {
     for (const closing of legacyClosings) map.set(closing.date, [...(map.get(closing.date) ?? []), closing]);
     return map;
   }, [legacyClosings]);
+  const milestonesByDate = useMemo(() => {
+    const map = new Map<string, ManifestationMilestone[]>();
+    for (const item of milestones) map.set(item.date, [...(map.get(item.date) ?? []), item]);
+    return map;
+  }, [milestones]);
 
   const allReviewDates = useMemo(() => [...new Set([
     ...daily.map((record) => record.date),
     ...journals.map((journal) => journal.date),
     ...legacyClosings.map((closing) => closing.date),
-  ])].sort((a, b) => b.localeCompare(a)), [daily, journals, legacyClosings]);
+    ...milestones.map((item) => item.date),
+  ])].sort((a, b) => b.localeCompare(a)), [daily, journals, legacyClosings, milestones]);
 
   const normalizedQuery = query.trim().toLocaleLowerCase("zh-Hant");
   const visibleReviewDates = useMemo(() => {
@@ -144,6 +154,7 @@ export default function ReviewPage() {
       const record = dailyByDate.get(date);
       const text = [
         record?.morning.intention,
+        record?.morning.creativeState,
         record?.morning.gratitude,
         record?.morning.affirmation,
         record?.morning.futureJournal,
@@ -160,10 +171,11 @@ export default function ReviewPage() {
         record?.evening.carryNote,
         ...(journalsByDate.get(date) ?? []).flatMap((journal) => Object.values(journal.answers)),
         ...(legacyClosingsByDate.get(date) ?? []).flatMap((closing) => [closing.title, closing.note]),
+        ...(milestonesByDate.get(date) ?? []).flatMap((item) => [item.action, item.response, item.trait, item.reflection]),
       ].filter(Boolean).join(" ").toLocaleLowerCase("zh-Hant");
       return text.includes(normalizedQuery);
     });
-  }, [allReviewDates, dailyByDate, dateFilter, journalsByDate, legacyClosingsByDate, normalizedQuery]);
+  }, [allReviewDates, dailyByDate, dateFilter, journalsByDate, legacyClosingsByDate, milestonesByDate, normalizedQuery]);
 
   const visibleEntries = useMemo(() => entries.filter((entry) => {
     if (dateFilter && entry.date !== dateFilter) return false;
@@ -249,6 +261,7 @@ export default function ReviewPage() {
               record={dailyByDate.get(date)}
               journals={journalsByDate.get(date) ?? []}
               legacyClosings={legacyClosingsByDate.get(date) ?? []}
+              milestones={milestonesByDate.get(date) ?? []}
             />
           ))}
           {visibleReviewDates.length === 0 && mode === "daily" && <div className="empty">這個條件下沒有日期回看。</div>}
@@ -284,11 +297,13 @@ function DailyReviewCard({
   record,
   journals,
   legacyClosings,
+  milestones,
 }: {
   date: string;
   record?: DailyRecord;
   journals: HistoricalJournal[];
   legacyClosings: LegacyClosing[];
+  milestones: ManifestationMilestone[];
 }) {
   const [englishStatus, setEnglishStatus] = useState<"idle" | "sending" | "sent">("idle");
   const [englishError, setEnglishError] = useState<string | null>(null);
@@ -309,7 +324,9 @@ function DailyReviewCard({
   const morningDepthLabel = record?.morning.depth === "deep" ? "深層" : record?.morning.depth === "medium" ? "中層" : record?.morning.startedAt ? "輕層" : null;
   const summaryStatus = record
     ? `${completed}/3 · ${hasEvening ? "已收光" : "未收光"}`
-    : `舊資料 · ${oldAnswers.length ? "有舊筆記" : "有收光處置"}`;
+    : milestones.length
+      ? `創現里程碑 · ${milestones.length} 則`
+      : `舊資料 · ${oldAnswers.length ? "有舊筆記" : "有收光處置"}`;
 
   function exportDay(mode: JournalExportMode) {
     const content = formatDailyJournalText({ date, record, journals, legacyClosings, mode });
@@ -340,7 +357,7 @@ function DailyReviewCard({
       <summary>
         <div>
           <span className="eyebrow">{fmtDate(date)}</span>
-          <b>{record?.morning.intention || (oldAnswers.length ? "這一天留有舊版筆記" : "這一天留下了一段紀錄")}</b>
+          <b>{record?.morning.intention || milestones[0]?.action || (oldAnswers.length ? "這一天留有舊版筆記" : "這一天留下了一段紀錄")}</b>
         </div>
         <span>{summaryStatus}</span>
       </summary>
@@ -359,7 +376,9 @@ function DailyReviewCard({
           )}
         </div>
         {englishError && <p className="form-error">{englishError}</p>}
-        {record?.morning.intention && <><h3>晨間意圖{morningDepthLabel ? ` · ${morningDepthLabel}` : ""}</h3><p className="review-prose">{record.morning.intention}</p></>}
+        {(record?.morning.intention || record?.morning.creativeState) && <><h3>晨間創作{morningDepthLabel ? ` · ${morningDepthLabel}` : ""}</h3><div className="review-note-stack">{record.morning.creativeState && <p><b>今天決定創作的狀態</b>{record.morning.creativeState}</p>}{record.morning.intention && <p><b>今日抉擇</b>{record.morning.intention}</p>}</div></>}
+
+        {milestones.length > 0 && <><h3>創現里程碑</h3><div className="review-milestones">{milestones.map((item) => <article key={item.id}><small>{item.trait}</small><b>{item.action}</b>{item.response && <p>現實回應：{item.response}</p>}{item.reflection && <p>這段進度：{item.reflection}</p>}</article>)}</div></>}
 
         {hasMorningNotes && (
           <>

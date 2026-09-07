@@ -42,8 +42,9 @@ export function formatDailyJournalText(params: {
   if (mode === "full" && record) {
     const morning = section("晨間", [
       record.morning.depth ? `晨間層級\n${DEPTH_LABELS[record.morning.depth]}` : null,
-      labeled("今日意圖", record.morning.intention),
+      labeled("今日抉擇", record.morning.intention),
       record.morning.state ? `此刻狀態\n${record.morning.state}` : null,
+      labeled("今天決定創作的狀態", record.morning.creativeState),
       labeled("我很感恩的三件事", record.morning.gratitude),
       labeled("我的正向肯定句", record.morning.affirmation),
       labeled("我的未來日記", record.morning.futureJournal),
