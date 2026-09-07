@@ -3370,6 +3370,160 @@
 .dojo .learning-material small { max-height: 3em; overflow: hidden; margin-top: 3px; color: var(--muted); font-size: 9.5px; line-height: 1.5; }
 .dojo .learning-material a { flex: 0 0 auto; color: var(--track-color); font-size: 9.5px; }
 
+/* 修習所・英文：獨立語境修習室入口與手動成果接收。只保存精簡回傳摘要，
+   不在行光道場複製練習介面。 */
+.dojo .context-room-bridge {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid #aebfca;
+  border-radius: 16px;
+  background: linear-gradient(145deg, #f8fbfc, #e6eff3);
+}
+.dojo .context-room-bridge-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.dojo .context-room-bridge-head h4 { margin: 2px 0 4px; font: 650 18px "Noto Serif TC", serif; }
+.dojo .context-room-bridge-head p { margin: 0; color: var(--muted); font-size: 10.5px; line-height: 1.6; }
+.dojo .context-room-external-mark {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid #aabdc7;
+  border-radius: 10px;
+  background: #f8fbfc;
+  color: #45657d;
+  font-size: 15px;
+}
+.dojo .context-room-bridge-actions {
+  display: grid;
+  grid-template-columns: 0.85fr 1.15fr;
+  gap: 8px;
+  margin-top: 13px;
+}
+.dojo .context-room-bridge-actions a,
+.dojo .context-room-bridge-actions button {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 43px;
+  padding: 8px;
+  text-align: center;
+  text-decoration: none;
+  font-size: 10px;
+  line-height: 1.4;
+}
+.dojo .context-room-return {
+  margin-top: 13px;
+  padding: 12px;
+  border: 1px solid #c1d0d8;
+  border-radius: 14px;
+  background: #fffefa;
+}
+.dojo .context-room-return-title {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.dojo .context-room-return-title small,
+.dojo .context-room-return-title b { display: block; }
+.dojo .context-room-return-title small { color: #668092; font-size: 8.5px; }
+.dojo .context-room-return-title b { margin-top: 2px; font-size: 13px; }
+.dojo .context-room-return-title button { min-height: 31px; padding: 5px 8px; font-size: 9px; }
+.dojo .context-room-return > label,
+.dojo .context-room-preview > label,
+.dojo .context-room-preview-grid label,
+.dojo .context-room-link-activity > label {
+  display: block;
+  color: #405b6e;
+  font-size: 9.5px;
+  font-weight: 800;
+}
+.dojo .context-room-return textarea,
+.dojo .context-room-return input,
+.dojo .context-room-return select {
+  width: 100%;
+  margin-top: 5px;
+  padding: 9px 10px;
+  border: 1px solid #c7d4dc;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 10.5px;
+  line-height: 1.55;
+}
+.dojo .context-room-return textarea { resize: vertical; }
+.dojo .context-room-return > p { margin: 6px 0 0; color: var(--muted); font-size: 8.5px; line-height: 1.5; }
+.dojo .context-room-parse { width: 100%; margin-top: 10px; }
+.dojo .context-room-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px 8px;
+}
+.dojo .context-room-preview-grid .wide { grid-column: 1 / -1; }
+.dojo .context-room-second-take {
+  display: flex !important;
+  align-items: center;
+  gap: 9px;
+  margin-top: 11px;
+  padding: 9px;
+  border: 1px solid #d1dce1;
+  border-radius: 11px;
+  background: #f4f8fa;
+}
+.dojo .context-room-second-take input { flex: 0 0 auto; width: 18px; margin: 0; }
+.dojo .context-room-second-take b,
+.dojo .context-room-second-take small { display: block; }
+.dojo .context-room-second-take small { margin-top: 2px; color: var(--muted); font-size: 8px; font-weight: 500; }
+.dojo .context-room-preview > label:not(.context-room-second-take) { margin-top: 11px; }
+.dojo .context-room-link-activity {
+  margin-top: 11px;
+  padding: 10px;
+  border: 1px solid #c6d4dc;
+  border-radius: 11px;
+  background: #edf4f7;
+}
+.dojo .context-room-link-activity small { display: block; margin-top: 5px; color: #687d89; font-size: 8.5px; line-height: 1.45; }
+.dojo .context-room-missing { margin: 9px 0 0; color: #9a4d42; font-size: 9px; font-weight: 750; }
+.dojo .context-room-preview-actions {
+  display: grid;
+  grid-template-columns: 0.8fr 1.2fr;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid #d8e1e5;
+}
+.dojo .context-room-preview-actions button { min-width: 0; padding: 8px 5px; font-size: 9.5px; }
+.dojo .context-room-recent { margin-top: 11px; border-top: 1px solid #c5d2d8; }
+.dojo .context-room-recent summary { padding: 10px 0 2px; color: #506f83; cursor: pointer; font-size: 9.5px; font-weight: 800; }
+.dojo .context-room-recent > div {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 0;
+  border-top: 1px dashed #cbd7dd;
+}
+.dojo .context-room-recent small,
+.dojo .context-room-recent b { display: block; }
+.dojo .context-room-recent small { color: var(--muted); font-size: 8.5px; }
+.dojo .context-room-recent b { margin: 2px 0; font-size: 10px; line-height: 1.4; }
+.dojo .context-room-recent em { flex: 0 0 auto; padding: 4px 6px; border-radius: 999px; background: #dfeaec; color: #4f6b73; font-size: 8px; font-style: normal; }
+
+@media (max-width: 390px) {
+  .dojo .context-room-bridge-actions,
+  .dojo .context-room-preview-grid,
+  .dojo .context-room-preview-actions { grid-template-columns: 1fr; }
+  .dojo .context-room-preview-grid .wide { grid-column: auto; }
+}
+
 /* 修習所・英文：低負擔 VoiceTube 主題修習。 */
 .dojo .topic-study-workbench {
   margin-top: 16px;

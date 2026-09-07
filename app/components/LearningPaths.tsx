@@ -15,6 +15,7 @@ import {
 import EnglishJournalWorkbench from "./EnglishJournalWorkbench";
 import EnglishTopicStudy from "./EnglishTopicStudy";
 import EnglishContextSeedInbox from "./EnglishContextSeedInbox";
+import EnglishContextRoomBridge from "./EnglishContextRoomBridge";
 
 async function responseJson<T>(response: Response): Promise<T> {
   const json = await response.json().catch(() => ({}));
@@ -114,6 +115,7 @@ export default function LearningPaths() {
       </div>}
 
       {!editing && <div className="learning-actions"><button className="primary" onClick={startLearning}>◷ 開始這次修習</button><button onClick={() => openQuickAdd({ presetSpace: "practice", presetKind: `學習／${LEARNING_TRACKS[selected].title}` })}>留下修習紀錄</button></div>}
+      {!editing && selected === "english" && <EnglishContextRoomBridge onCompleted={load} />}
       {!editing && selected === "english" && <EnglishTopicStudy onCompleted={load} />}
       {!editing && selected === "english" && <EnglishJournalWorkbench initialDate={journalDate} onCompleted={load} />}
       {!editing && selected === "english" && <EnglishContextSeedInbox />}

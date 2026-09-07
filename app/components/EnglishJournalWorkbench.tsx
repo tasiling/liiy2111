@@ -344,7 +344,7 @@ export default function EnglishJournalWorkbench({
       setPractices((current) => current.map((item) => item.date === result.practice.date ? result.practice : item));
       setSelectedContextKeys([]);
       window.dispatchEvent(new Event("lumen-context-seeds-updated"));
-      setNotice(`已放進語境修習候選匣：新增 ${result.created} 項${result.existing ? `；${result.existing} 項原本已存在` : ""}。`);
+      setNotice(`已放進句型語法修習匣：新增 ${result.created} 項${result.existing ? `；${result.existing} 項原本已存在` : ""}。`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
@@ -479,7 +479,7 @@ export default function EnglishJournalWorkbench({
                           onChange={(event) => updateSegment({ contextNotes: event.target.value })}
                           placeholder={"每行一項，例如：\n句型｜I feel that ... works better for me｜比較不同學習方式\n語法｜try → tried｜敘述今天已發生的事"}
                         />
-                        <small className="field-help">句型與語法不進豆倉，會送到語境修習候選匣。</small>
+                        <small className="field-help">句型與語法不進豆倉，會送到句型語法修習匣。</small>
                       </details>
 
                       <button type="button" className="primary english-segment-complete" disabled={saving || Boolean(currentSegment.completedAt) || !canCompleteSegment(currentSegment)} onClick={() => void savePractice({ completeSegment: true })}>
@@ -517,7 +517,7 @@ export default function EnglishJournalWorkbench({
                     <div><small>單字記憶出口</small><h4>送往 VocabForge</h4></div>
                     <span>{selectedVocabKeys.length}/3 已選</span>
                   </div>
-                  <p>只挑真正想記住的英文單字；句型和語法留給語境修習室。</p>
+                  <p>只挑真正想記住的英文單字；句型和語法留給句型語法修習匣。</p>
                   <div className="vocabforge-candidate-list">
                     {vocabCandidates.map((candidate) => {
                       const exported = exportedVocabKeys.has(candidate.key);
@@ -550,7 +550,7 @@ export default function EnglishJournalWorkbench({
 
               {contextCandidates.length > 0 && (
                 <section className="vocabforge-candidate-tray context-candidate-tray">
-                  <div className="subsection-title"><div><small>主動使用出口</small><h4>送往語境修習候選匣</h4></div><span>{selectedContextKeys.length}/2 已選</span></div>
+                  <div className="subsection-title"><div><small>主動使用出口</small><h4>送往句型語法修習匣</h4></div><span>{selectedContextKeys.length}/2 已選</span></div>
                   <p>挑一句真正想換情境再用的句型，或一個會反覆犯錯的語法。</p>
                   <div className="vocabforge-candidate-list">
                     {contextCandidates.map((candidate) => {

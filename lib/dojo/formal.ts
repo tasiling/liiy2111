@@ -12,8 +12,10 @@ import {
   type TraceStatus,
 } from "./constants";
 import { ENGLISH_JOURNAL_TITLE_PREFIX } from "./englishJournal";
+import { CONTEXT_ROOM_RESULT_TITLE_PREFIX } from "./contextRoomResult";
 
 export { ENGLISH_JOURNAL_TITLE_PREFIX };
+export { CONTEXT_ROOM_RESULT_TITLE_PREFIX };
 
 export const DAILY_TITLE_PREFIX = "行光今日-";
 export const BINGO_TITLE_PREFIX = "行光週盤-";
@@ -31,6 +33,7 @@ export const FORMAL_STATE_TITLE_PREFIXES = [
   LEARNING_TITLE_PREFIX,
   WEAVING_PROJECT_TITLE_PREFIX,
   ENGLISH_JOURNAL_TITLE_PREFIX,
+  CONTEXT_ROOM_RESULT_TITLE_PREFIX,
 ] as const;
 
 export const TAIPEI_TIME_ZONE = "Asia/Taipei";
