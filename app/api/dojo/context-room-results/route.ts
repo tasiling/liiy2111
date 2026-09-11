@@ -4,16 +4,21 @@ import {
   listRecentContextResults,
   saveContextRoomResult,
 } from "@/lib/dojo/contextRoomResultStore";
+import {
+  acknowledgeContextRoomNotionResult,
+  listContextRoomNotionInbox,
+} from "@/lib/dojo/contextRoomNotionInbox";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const [activities, recent] = await Promise.all([
+    const [activities, recent, inbox] = await Promise.all([
       listContextActivityCandidates(),
       listRecentContextResults(3),
+      listContextRoomNotionInbox(),
     ]);
-    return NextResponse.json({ activities, recent });
+    return NextResponse.json({ activities, recent, inbox });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }
@@ -26,7 +31,24 @@ export async function POST(req: NextRequest) {
       draft: body.draft,
       linkedActivityId: body.linkedActivityId,
     });
-    return NextResponse.json({ ok: true, ...saved }, { status: saved.duplicate ? 200 : 201 });
+    let notionAcknowledged = false;
+    let acknowledgementWarning: string | null = null;
+    const notionPageId = typeof body.notionPageId === "string" ? body.notionPageId.trim() : "";
+    if (notionPageId && saved.result.sourceEventId) {
+      try {
+        await acknowledgeContextRoomNotionResult({
+          notionPageId,
+          sourceEventId: saved.result.sourceEventId,
+        });
+        notionAcknowledged = true;
+      } catch (error) {
+        acknowledgementWarning = error instanceof Error ? error.message : String(error);
+      }
+    }
+    return NextResponse.json(
+      { ok: true, ...saved, notionAcknowledged, acknowledgementWarning },
+      { status: saved.duplicate ? 200 : 201 }
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const status = /還缺少|不正確|尚未達到|請重新選擇/.test(message) ? 400 : /找不到|已封存/.test(message) ? 409 : 500;

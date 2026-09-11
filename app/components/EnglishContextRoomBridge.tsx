@@ -16,9 +16,21 @@ import {
   type ContextTopicLabel,
 } from "@/lib/dojo/contextRoomResult";
 
-const CONTEXT_ROOM_URL = "https://lumen-context-room.liiy21110.chatgpt.site";
+const CONTEXT_ROOM_URL = "https://lumen-context-room-production-4a2c.up.railway.app";
 
 type SavedResult = ContextRoomResult & { id: string };
+type InboxItem = {
+  notionPageId: string;
+  syncedAt: string;
+  draft: ContextRoomResultDraft;
+};
+type InboxState = {
+  ready: boolean;
+  usingDedicatedToken: boolean;
+  items: InboxItem[];
+  invalidCount: number;
+  error: string | null;
+};
 
 async function responseJson<T>(response: Response): Promise<T> {
   const json = await response.json().catch(() => ({}));
@@ -46,22 +58,33 @@ export default function EnglishContextRoomBridge({ onCompleted }: { onCompleted?
   const [draft, setDraft] = useState<ContextRoomResultDraft | null>(null);
   const [activities, setActivities] = useState<ContextActivityCandidate[]>([]);
   const [recent, setRecent] = useState<SavedResult[]>([]);
+  const [inbox, setInbox] = useState<InboxState | null>(null);
+  const [notionPageId, setNotionPageId] = useState<string | null>(null);
   const [linkedActivityId, setLinkedActivityId] = useState("");
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (showRefreshing = false) => {
+    if (showRefreshing) setRefreshing(true);
     try {
       const response = await fetch("/api/dojo/context-room-results", { cache: "no-store" });
-      const result = await responseJson<{ activities: ContextActivityCandidate[]; recent: SavedResult[] }>(response);
+      const result = await responseJson<{
+        activities: ContextActivityCandidate[];
+        recent: SavedResult[];
+        inbox: InboxState;
+      }>(response);
       setActivities(result.activities ?? []);
       setRecent(result.recent ?? []);
+      setInbox(result.inbox ?? null);
+      setError(null);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
@@ -76,9 +99,20 @@ export default function EnglishContextRoomBridge({ onCompleted }: { onCompleted?
   function beginPaste() {
     setOpen(true);
     setDraft(null);
+    setNotionPageId(null);
     setLinkedActivityId("");
     setError(null);
     setNotice(null);
+  }
+
+  function previewInboxItem(item: InboxItem) {
+    setOpen(true);
+    setRaw(item.draft.rawSummary);
+    setDraft(item.draft);
+    setNotionPageId(item.notionPageId);
+    setLinkedActivityId("");
+    setError(null);
+    setNotice("已載入 Notion 同步成果。確認內容與要關聯的活動後再保存。");
   }
 
   function parseSummary() {
@@ -88,6 +122,7 @@ export default function EnglishContextRoomBridge({ onCompleted }: { onCompleted?
     }
     const parsed = parseContextRoomSummary(raw, taipeiToday());
     setDraft(parsed.draft);
+    setNotionPageId(null);
     setLinkedActivityId("");
     setError(null);
     setNotice(parsed.missingFields.length
@@ -109,18 +144,27 @@ export default function EnglishContextRoomBridge({ onCompleted }: { onCompleted?
       const response = await fetch("/api/dojo/context-room-results", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ draft, linkedActivityId: linkedActivityId || null }),
+        body: JSON.stringify({
+          draft,
+          linkedActivityId: linkedActivityId || null,
+          notionPageId,
+        }),
       });
       const result = await responseJson<{
         result: SavedResult;
         duplicate: boolean;
         activityLabel: string | null;
+        notionAcknowledged: boolean;
+        acknowledgementWarning: string | null;
       }>(response);
-      setNotice(result.duplicate
+      const successMessage = result.duplicate
         ? "這筆語境修習已經記錄，沒有重複增加完成次數。"
         : result.activityLabel
           ? `成果已保存至英文修習紀錄，並只完成「${result.activityLabel}」這一格。`
-          : "成果已保存至英文修習紀錄；這次是自由修習，沒有變更週盤或今日三件事。"
+          : "成果已保存至英文修習紀錄；這次是自由修習，沒有變更週盤或今日三件事。";
+      setNotice(result.acknowledgementWarning
+        ? `${successMessage} Notion 的接收標記暫時未更新：${result.acknowledgementWarning}`
+        : successMessage
       );
       setRecent((current) => [result.result, ...current.filter((item) => item.id !== result.result.id)].slice(0, 3));
       setActivities((current) => result.activityLabel
@@ -129,7 +173,14 @@ export default function EnglishContextRoomBridge({ onCompleted }: { onCompleted?
       );
       setDraft(null);
       setRaw("");
+      setNotionPageId(null);
       setLinkedActivityId("");
+      if (result.notionAcknowledged) {
+        setInbox((current) => current ? {
+          ...current,
+          items: current.items.filter((item) => item.notionPageId !== notionPageId),
+        } : current);
+      }
       await onCompleted?.();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
@@ -145,11 +196,45 @@ export default function EnglishContextRoomBridge({ onCompleted }: { onCompleted?
     </div>
     <div className="context-room-bridge-actions">
       <a className="primary" href={CONTEXT_ROOM_URL} target="_blank" rel="noreferrer">開啟語境修習室</a>
-      <button type="button" onClick={beginPaste}>從語境修習室貼回成果</button>
+      <button type="button" onClick={beginPaste}>手動貼回成果</button>
+    </div>
+
+    <div className="context-room-inbox">
+      <div className="context-room-inbox-head">
+        <div>
+          <small>Notion 同步</small>
+          <b>成果收件匣</b>
+        </div>
+        <button type="button" disabled={refreshing} onClick={() => void load(true)}>
+          {refreshing ? "更新中…" : "重新整理"}
+        </button>
+      </div>
+      {loading ? <p>正在讀取已同步的修習成果…</p> : inbox?.ready ? <>
+        {inbox.items.length > 0 ? <div className="context-room-inbox-list">
+          {inbox.items.map((item) => <button
+            type="button"
+            key={item.notionPageId}
+            className={notionPageId === item.notionPageId ? "selected" : ""}
+            onClick={() => previewInboxItem(item)}
+          >
+            <span>
+              <small>{item.draft.practicedOn}</small>
+              <b>{item.draft.materialTitle}{item.draft.batchLabel ? `｜${item.draft.batchLabel}` : ""}</b>
+              <small>{item.draft.topicLabel ?? "待確認"} · {item.draft.practiceMode ? CONTEXT_PRACTICE_MODE_LABELS[item.draft.practiceMode] : "待確認模式"}</small>
+            </span>
+            <em>預覽</em>
+          </button>)}
+        </div> : <p className="context-room-inbox-empty">目前沒有等待接收的成果。完成語境修習並同步至 Notion 後，再回來重新整理即可。</p>}
+        {inbox.invalidCount > 0 && <p className="context-room-inbox-warning">另有 {inbox.invalidCount} 筆同步資料缺少 sourceEventId，暫不接收。</p>}
+      </> : <div className="context-room-inbox-unavailable">
+        <b>Notion 收件匣尚未連線</b>
+        <p>{inbox?.error || "目前無法讀取同步成果。"}</p>
+        <small>你仍可使用上方的「手動貼回成果」。</small>
+      </div>}
     </div>
 
     {open && <div className="context-room-return">
-      <div className="context-room-return-title"><div><small>回到行光道場</small><b>{draft ? "確認這次修習成果" : "貼上成果摘要"}</b></div><button type="button" onClick={() => { setOpen(false); setDraft(null); setError(null); setNotice(null); }}>關閉</button></div>
+      <div className="context-room-return-title"><div><small>回到行光道場</small><b>{draft ? "確認這次修習成果" : "貼上成果摘要"}</b></div><button type="button" onClick={() => { setOpen(false); setDraft(null); setNotionPageId(null); setError(null); setNotice(null); }}>關閉</button></div>
       {!draft ? <>
         <label htmlFor="context-room-summary">語境修習室成果摘要</label>
         <textarea id="context-room-summary" rows={9} value={raw} onChange={(event) => setRaw(event.target.value)} placeholder={'素材：Magic Tree House #1 Chapter 1–3\n完成：解釋 2 / 5\n模式：主題口說\nSecond Take：完成\n留下表達：3 個\n狀態：Responded\n本次卡點：解釋人物動機時容易停頓'} />
@@ -166,7 +251,10 @@ export default function EnglishContextRoomBridge({ onCompleted }: { onCompleted?
           <label>留下表達數<input type="number" min={0} max={99} value={draft.expressionCount} onChange={(event) => patchDraft({ expressionCount: Number(event.target.value) || 0 })} /></label>
           <label>記入日期 *<input type="date" value={draft.practicedOn} onChange={(event) => patchDraft({ practicedOn: event.target.value })} /></label>
         </div>
-        <label className="context-room-second-take"><input type="checkbox" checked={draft.secondTakeCompleted} onChange={(event) => patchDraft({ secondTakeCompleted: event.target.checked })} /><span><b>Second Take 已完成</b><small>若成果摘要顯示 Revised Draft，可在此確認。</small></span></label>
+        <div className="context-room-completion-flags">
+          <label className="context-room-second-take"><input type="checkbox" checked={draft.firstCompleted} onChange={(event) => patchDraft({ firstCompleted: event.target.checked })} /><span><b>First 已完成</b><small>First Draft、First Answer 或一次有效快速重說。</small></span></label>
+          <label className="context-room-second-take"><input type="checkbox" checked={draft.secondTakeCompleted} onChange={(event) => patchDraft({ secondTakeCompleted: event.target.checked })} /><span><b>Second Take 已完成</b><small>Revised Draft 或第二次回答已完成。</small></span></label>
+        </div>
         <label>本次卡點<textarea rows={3} value={draft.focus} onChange={(event) => patchDraft({ focus: event.target.value })} placeholder="沒有卡點可以留空" /></label>
 
         <div className="context-room-link-activity">
@@ -178,12 +266,12 @@ export default function EnglishContextRoomBridge({ onCompleted }: { onCompleted?
           <small>{canLink ? "只會完成你在這裡選擇的一項活動。" : "目前狀態尚未達完成門檻，仍可保存為自由修習。"}</small>
         </div>
         {missing.length > 0 && <p className="context-room-missing">還需要確認：{missing.join("、")}</p>}
-        <div className="context-room-preview-actions"><button type="button" onClick={() => { setDraft(null); setLinkedActivityId(""); }}>返回修改原文</button><button type="button" className="primary" disabled={saving || missing.length > 0} onClick={() => void save()}>{saving ? "保存中…" : "確認保存"}</button></div>
+        <div className="context-room-preview-actions"><button type="button" onClick={() => { setDraft(null); setNotionPageId(null); setLinkedActivityId(""); }}>{notionPageId ? "改用手動貼回" : "返回修改原文"}</button><button type="button" className="primary" disabled={saving || missing.length > 0} onClick={() => void save()}>{saving ? "保存中…" : "確認保存"}</button></div>
       </div>}
       {error && <p className="form-error" role="alert">{error}</p>}
       {notice && <p className="save-notice">{notice}</p>}
     </div>}
 
-    {!loading && recent.length > 0 && <details className="context-room-recent"><summary>最近貼回的成果</summary>{recent.map((result) => <div key={result.id}><span><small>{result.practicedOn}</small><b>{result.materialTitle}{result.batchLabel ? `｜${result.batchLabel}` : ""}</b><small>{resultSubtitle(result)}</small></span>{result.linkedActivityCompletedAt ? <em>已完成活動</em> : <em>自由修習</em>}</div>)}</details>}
+    {!loading && recent.length > 0 && <details className="context-room-recent"><summary>最近接收的成果</summary>{recent.map((result) => <div key={result.id}><span><small>{result.practicedOn}</small><b>{result.materialTitle}{result.batchLabel ? `｜${result.batchLabel}` : ""}</b><small>{resultSubtitle(result)}</small></span>{result.linkedActivityCompletedAt ? <em>已完成活動</em> : <em>自由修習</em>}</div>)}</details>}
   </section>;
 }

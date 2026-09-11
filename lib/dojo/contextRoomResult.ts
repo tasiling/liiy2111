@@ -16,6 +16,7 @@ export type ContextRoomResultDraft = {
   topicLabel: ContextTopicLabel | null;
   topicPosition: number | null;
   practiceMode: ContextPracticeMode | null;
+  firstCompleted: boolean;
   secondTakeCompleted: boolean;
   expressionCount: number;
   contextRoomStatus: ContextRoomStatus | null;
@@ -123,6 +124,8 @@ export function parseContextRoomSummary(raw: string, defaultDate: string): Conte
   const topicMatch = completion.match(/(重述|解釋|連結|判斷|轉用)(?:\s*(\d+))?/);
   const expressionMatch = (values.get("留下表達") ?? "").match(/\d+/);
   const secondTake = values.get("SecondTake") ?? values.get("Second Take") ?? "";
+  const status = parseStatus(values.get("狀態") ?? "");
+  const firstCompletedValue = values.get("First完成") ?? values.get("First完成狀態") ?? "";
   const draft: ContextRoomResultDraft = {
     sourceEventId: clean(values.get("sourceEventId") ?? values.get("來源事件ID"), 200) || null,
     materialTitle: material.materialTitle.slice(0, 500),
@@ -130,9 +133,12 @@ export function parseContextRoomSummary(raw: string, defaultDate: string): Conte
     topicLabel: topicMatch?.[1] as ContextTopicLabel | undefined ?? null,
     topicPosition: topicMatch?.[2] ? Math.max(1, Math.min(99, Number(topicMatch[2]))) : null,
     practiceMode: parseMode(values.get("模式") ?? ""),
+    firstCompleted: firstCompletedValue
+      ? parseSecondTake(firstCompletedValue)
+      : Boolean(status && !["New", "Understood"].includes(status)),
     secondTakeCompleted: parseSecondTake(secondTake),
     expressionCount: Math.max(0, Math.min(99, Number(expressionMatch?.[0] ?? 0))),
-    contextRoomStatus: parseStatus(values.get("狀態") ?? ""),
+    contextRoomStatus: status,
     focus: clean(values.get("本次卡點") ?? values.get("卡點"), 2000),
     practicedOn: validDate(values.get("日期")) || defaultDate,
     rawSummary,
@@ -142,6 +148,9 @@ export function parseContextRoomSummary(raw: string, defaultDate: string): Conte
 
 export function normalizeContextRoomDraft(value: unknown): ContextRoomResultDraft {
   const source = value && typeof value === "object" ? value as Partial<ContextRoomResultDraft> : {};
+  const contextRoomStatus = CONTEXT_ROOM_STATUSES.includes(source.contextRoomStatus as ContextRoomStatus)
+    ? source.contextRoomStatus as ContextRoomStatus
+    : null;
   return {
     sourceEventId: clean(source.sourceEventId, 200) || null,
     materialTitle: clean(source.materialTitle, 500),
@@ -151,9 +160,12 @@ export function normalizeContextRoomDraft(value: unknown): ContextRoomResultDraf
       ? Math.max(1, Math.min(99, Math.round(source.topicPosition)))
       : null,
     practiceMode: CONTEXT_PRACTICE_MODES.includes(source.practiceMode as ContextPracticeMode) ? source.practiceMode as ContextPracticeMode : null,
+    firstCompleted: typeof source.firstCompleted === "boolean"
+      ? source.firstCompleted
+      : Boolean(contextRoomStatus && !["New", "Understood"].includes(contextRoomStatus)),
     secondTakeCompleted: source.secondTakeCompleted === true,
     expressionCount: Math.max(0, Math.min(99, Math.round(Number(source.expressionCount) || 0))),
-    contextRoomStatus: CONTEXT_ROOM_STATUSES.includes(source.contextRoomStatus as ContextRoomStatus) ? source.contextRoomStatus as ContextRoomStatus : null,
+    contextRoomStatus,
     focus: clean(source.focus, 2000),
     practicedOn: validDate(source.practicedOn),
     rawSummary: clean(source.rawSummary, 8000),
@@ -187,6 +199,7 @@ export function contextResultDuplicateKey(draft: ContextRoomResultDraft): string
 
 export function contextResultCanCompleteActivity(draft: ContextRoomResultDraft): boolean {
   return Boolean(
+    draft.firstCompleted &&
     draft.topicLabel &&
     draft.practiceMode &&
     draft.contextRoomStatus &&
