@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { WEAVING_OUTPUT_TYPES, type WeavingOutputType } from "@/lib/dojo/formal";
-import type { ReadingWeavingProjectWithCards } from "@/lib/dojo/weavingProjects";
+import { WEAVING_FORMATS, type WeavingFormat } from "@/lib/dojo/weavingProjects";
+import type { WeavingShuttleBundle } from "@/lib/dojo/weavingShuttle";
 import {
   ACTIVE_INSIGHT_STATUSES,
   INSIGHT_TOPICS,
@@ -26,10 +26,10 @@ type InsightSource = { sourceNoteId: string; sourceText: string };
 export default function ReadingCardsPage() {
   const router = useRouter();
   const [cards, setCards] = useState<InsightCardWithBook[]>([]);
-  const [weavingProjects, setWeavingProjects] = useState<ReadingWeavingProjectWithCards[]>([]);
+  const [weavingProjects, setWeavingProjects] = useState<WeavingShuttleBundle[]>([]);
   const [selectedForWeaving, setSelectedForWeaving] = useState<string[]>([]);
   const [projectTitle, setProjectTitle] = useState("");
-  const [outputType, setOutputType] = useState<WeavingOutputType | null>(null);
+  const [outputType, setOutputType] = useState<WeavingFormat | null>(null);
   const [creatingProject, setCreatingProject] = useState(false);
   const [todayISO, setTodayISO] = useState("");
   const [view, setView] = useState<View>("due");
@@ -42,12 +42,12 @@ export default function ReadingCardsPage() {
     try {
       const [response, projectsResponse] = await Promise.all([
         fetch("/api/dojo/reading/cards", { cache: "no-store" }),
-        fetch("/api/dojo/weaving-projects", { cache: "no-store" }),
+        fetch("/api/dojo/weaving-shuttles", { cache: "no-store" }),
       ]);
       const json = await readJson<{ cards: InsightCardWithBook[]; todayISO: string }>(response);
-      const projectJson = await readJson<{ projects: ReadingWeavingProjectWithCards[] }>(projectsResponse);
+      const projectJson = await readJson<{ bundles: WeavingShuttleBundle[] }>(projectsResponse);
       setCards(json.cards ?? []);
-      setWeavingProjects(projectJson.projects ?? []);
+      setWeavingProjects(projectJson.bundles ?? []);
       setTodayISO(json.todayISO);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
@@ -64,7 +64,7 @@ export default function ReadingCardsPage() {
   const dueCards = useMemo(() => cards.filter((card) =>
     ACTIVE_INSIGHT_STATUSES.includes(card.status) && Boolean(card.nextVisitAt && card.nextVisitAt <= todayISO)
   ), [cards, todayISO]);
-  const assignedToWeaving = useMemo(() => new Set(weavingProjects.flatMap((project) => project.insightCardIds)), [weavingProjects]);
+  const assignedToWeaving = useMemo(() => new Set(weavingProjects.flatMap((bundle) => bundle.shuttle.sourceRefs.filter((ref) => ref.sourceType === "reading_insight").map((ref) => ref.sourceId))), [weavingProjects]);
   const programCards = useMemo(() => cards.filter((card) =>
     (card.status === "已驗證" || card.status === "不成立") && card.programApplication === "未定" && !assignedToWeaving.has(card.id)
   ), [assignedToWeaving, cards]);
@@ -85,13 +85,13 @@ export default function ReadingCardsPage() {
     setCreatingProject(true);
     setError(null);
     try {
-      const response = await fetch("/api/dojo/weaving-projects", {
+      const response = await fetch("/api/dojo/weaving-shuttles", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: projectTitle, outputType, insightCardIds: selectedForWeaving }),
+        body: JSON.stringify({ coreStatement: projectTitle, format: outputType, sourceType: "reading_insights", insightCardIds: selectedForWeaving }),
       });
-      const json = await readJson<{ projects: ReadingWeavingProjectWithCards[] }>(response);
-      setWeavingProjects(json.projects ?? []);
+      const json = await readJson<{ bundle: WeavingShuttleBundle }>(response);
+      setWeavingProjects((current) => [json.bundle, ...current]);
       setSelectedForWeaving([]);
       setProjectTitle("");
       setOutputType(null);
@@ -144,11 +144,11 @@ export default function ReadingCardsPage() {
           />
           {selectedForWeaving.length > 0 && <section className="reading-weaving-composer">
             <div><span className="eyebrow">送往織光堂</span><h2>{selectedForWeaving.length} 張洞察組成一個企劃</h2><p>只建立來源關聯；洞察原文仍由 Notion DB-22 保管。</p></div>
-            <label>企劃題目（可稍後修改）</label>
-            <input value={projectTitle} onChange={(event) => setProjectTitle(event.target.value)} placeholder="留白時以第一張洞察命名" />
-            <label>想做成什麼？</label>
-            <div className="reading-output-picker">{Object.entries(WEAVING_OUTPUT_TYPES).map(([key, label]) => <button key={key} className={outputType === key ? "on" : ""} onClick={() => setOutputType(key as WeavingOutputType)}>{label}</button>)}</div>
-            <button className="primary" disabled={!outputType || creatingProject} onClick={() => void createWeavingProject()}>{creatingProject ? "建立中…" : outputType ? "建立織光企劃" : "先選擇成品形式"}</button>
+            <label>這次最想說的一句話</label>
+            <input value={projectTitle} onChange={(event) => setProjectTitle(event.target.value)} placeholder="不是摘要，而是作品真正要說的主張" />
+            <label>先做成哪一種形式？</label>
+            <div className="reading-output-picker">{Object.entries(WEAVING_FORMATS).map(([key, label]) => <button key={key} className={outputType === key ? "on" : ""} onClick={() => setOutputType(key as WeavingFormat)}>{label}</button>)}</div>
+            <button className="primary" disabled={!outputType || !projectTitle.trim() || creatingProject} onClick={() => void createWeavingProject()}>{creatingProject ? "建立中…" : outputType ? "建立織光杼與作品 A" : "先選擇主要形式"}</button>
           </section>}
         </>
       )}

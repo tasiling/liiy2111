@@ -4884,3 +4884,127 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* 織光堂 × 聊解室第一階段：作品與發布版本分開，手機以單一卡片逐步操作。 */
+.dojo .weaving-create-card,
+.dojo .source-work-card,
+.dojo .tool-handoff-card,
+.dojo .draft-return-card,
+.dojo .next-action-card,
+.dojo .liaojie-workbench-entry { margin: 14px 0; }
+.dojo .weaving-create-flow,
+.dojo .publication-fields { display: grid; gap: 8px; margin-top: 12px; }
+.dojo .weaving-create-flow > label,
+.dojo .publication-fields > label,
+.dojo .source-work-card > label,
+.dojo .draft-return-card > label,
+.dojo .next-action-card > label { margin-top: 6px; color: #655b4d; font-size: 11px; font-weight: 700; }
+.dojo .format-choice-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+.dojo .format-choice-grid button { min-width: 0; min-height: 76px; padding: 9px 6px; }
+.dojo .format-choice-grid button b,
+.dojo .format-choice-grid button small { display: block; }
+.dojo .format-choice-grid button small { margin-top: 4px; color: var(--muted); font-size: 8px; line-height: 1.35; }
+.dojo .format-choice-grid button.on,
+.dojo .text-subtype-grid button.on,
+.dojo .platform-picker button.on,
+.dojo .board-empty-grid button.on { border-color: var(--we); background: #dfeaec; color: #35545d; font-weight: 700; }
+.dojo .format-choice-grid.compact button { min-height: 42px; }
+.dojo .weaving-project-list { display: grid; gap: 9px; }
+.dojo .weaving-project-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(90px, .42fr); gap: 10px; padding: 13px; border: 1px solid #c8d4d8; border-radius: 15px; background: #fffefa; color: inherit; text-decoration: none; }
+.dojo .weaving-project-row small,
+.dojo .weaving-project-row b { display: block; }
+.dojo .weaving-project-row > div > b { margin-top: 4px; font: 650 15px "Noto Serif TC", serif; }
+.dojo .weaving-project-row p { margin: 5px 0 0; color: #655f55; font-size: 10px; line-height: 1.5; }
+.dojo .weaving-project-row > span { padding-left: 10px; border-left: 1px solid #d9e1e4; color: var(--muted); font-size: 8.5px; line-height: 1.4; }
+.dojo .weaving-project-row > span b { margin-top: 4px; color: #405e68; font-size: 10px; }
+.dojo .weaving-workbench-screen .hero,
+.dojo .liaojie-workbench-screen .hero { margin-bottom: 14px; }
+.dojo .source-work-card details,
+.dojo .publication-source-card details { margin: 10px 0; border: 1px solid var(--line); border-radius: 12px; background: #faf7ef; }
+.dojo .source-work-card summary,
+.dojo .publication-source-card summary { padding: 10px; cursor: pointer; font-size: 11px; font-weight: 700; }
+.dojo .source-work-card details p { max-height: 240px; margin: 0; padding: 0 10px 12px; overflow: auto; white-space: pre-wrap; font-size: 11px; line-height: 1.65; }
+.dojo .text-subtype-grid,
+.dojo .platform-picker { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 10px; }
+.dojo .text-subtype-grid button,
+.dojo .platform-picker button { min-width: 0; min-height: 43px; padding: 7px; font-size: 10px; }
+.dojo .tool-handoff-card p,
+.dojo .future-format-card p { color: var(--muted); font-size: 11px; line-height: 1.6; }
+.dojo .work-draft-field { min-height: 300px; line-height: 1.7; }
+.dojo .full-text-preview { max-height: 65vh; padding: 14px; overflow: auto; border: 1px solid #dccfb9; border-radius: 13px; background: #fffdf7; color: #3f3a34; font-size: 12px; line-height: 1.8; white-space: pre-wrap; word-break: break-word; }
+.dojo .text-preview-card > .primary { width: 100%; margin-top: 12px; }
+.dojo .full-button { width: 100%; margin-top: 10px; }
+.dojo .archive-project-button { width: 100%; margin-top: 9px; }
+.dojo .board-picker-sheet { max-height: 86vh; overflow: auto; }
+.dojo .board-picker-sheet > p { color: var(--muted); font-size: 11px; line-height: 1.5; }
+.dojo .board-empty-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 12px 0; }
+.dojo .board-empty-grid button { min-width: 0; padding: 7px 3px; font-size: 9px; }
+.dojo .publication-project-tabs { display: flex; gap: 8px; margin: 12px 0; padding-bottom: 3px; overflow-x: auto; }
+.dojo .publication-project-tabs button { flex: 0 0 145px; min-height: 70px; padding: 9px; text-align: left; }
+.dojo .publication-project-tabs button small,
+.dojo .publication-project-tabs button b { display: block; }
+.dojo .publication-project-tabs button small { color: var(--muted); font-size: 8px; }
+.dojo .publication-project-tabs button b { margin-top: 4px; font-size: 10px; line-height: 1.4; }
+.dojo .publication-project-tabs button.on { border-color: var(--li); background: #f4e7eb; }
+.dojo .publication-source-card > p { padding: 9px 10px; border-left: 3px solid var(--li); background: #faf0f3; font-size: 11px; line-height: 1.6; }
+.dojo .publication-source-card > p b { display: block; margin-bottom: 3px; }
+.dojo .publication-preview > p { line-height: 1.75; white-space: pre-wrap; }
+.dojo .publication-preview blockquote { margin: 12px 0; padding: 10px; border-left: 3px solid var(--li); background: #faf0f3; }
+.dojo .publication-save-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin-top: 13px; }
+.dojo .publication-save-actions button { min-width: 0; padding: 8px 4px; font-size: 9px; }
+
+/* 織光杼：母卡保存經線，作品緯線各自承接草稿、成品與回杼。 */
+.dojo .shuttle-row em { display: inline-block; margin-top: 7px; color: #506a72; font-size: 8.5px; font-style: normal; font-weight: 700; }
+.dojo .shuttle-core-card,
+.dojo .work-lines-card,
+.dojo .current-work-card,
+.dojo .reflection-card,
+.dojo .legacy-upgrade-card { margin: 14px 0; }
+.dojo .shuttle-core-card > label,
+.dojo .current-work-card > label,
+.dojo .new-work-form > label,
+.dojo .reflection-card > label { display: block; margin: 10px 0 5px; color: #655b4d; font-size: 10px; font-weight: 750; }
+.dojo .core-thread-statement { margin: 9px 0 12px; padding: 12px; border-left: 3px solid var(--we); border-radius: 0 12px 12px 0; background: #edf3f4; font: 600 12px/1.7 "Noto Serif TC", serif; }
+.dojo .shuttle-core-card details { margin: 10px 0 13px; border: 1px solid #cbd7da; border-radius: 12px; background: #f9fbfa; }
+.dojo .shuttle-core-card summary { padding: 10px; cursor: pointer; color: #45616b; font-size: 10px; font-weight: 750; }
+.dojo .source-thread-snapshot { max-height: 220px; margin: 0 10px 10px; padding: 10px; overflow: auto; border-radius: 10px; background: #fffefa; color: #625f58; font-size: 9px; line-height: 1.65; white-space: pre-wrap; }
+.dojo .core-version-list { display: grid; gap: 7px; margin: 0; padding: 0 10px 11px; list-style: none; }
+.dojo .core-version-list li { padding: 9px; border-left: 2px solid #9aafb5; background: #eef3f3; }
+.dojo .core-version-list b,
+.dojo .core-version-list small { display: block; }
+.dojo .core-version-list b { font-size: 9.5px; line-height: 1.55; }
+.dojo .core-version-list small { margin-top: 3px; color: var(--muted); font-size: 8px; line-height: 1.45; }
+.dojo .work-line-tabs { display: flex; gap: 8px; margin-top: 11px; padding: 1px 1px 5px; overflow-x: auto; scroll-snap-type: x proximity; }
+.dojo .work-line-tabs > button { flex: 0 0 164px; min-height: 91px; padding: 10px; scroll-snap-align: start; text-align: left; }
+.dojo .work-line-tabs small,
+.dojo .work-line-tabs b,
+.dojo .work-line-tabs span { display: block; }
+.dojo .work-line-tabs small { color: #597079; font-size: 8px; }
+.dojo .work-line-tabs b { margin-top: 5px; font-size: 10.5px; line-height: 1.45; }
+.dojo .work-line-tabs span { margin-top: 6px; color: var(--muted); font-size: 8px; }
+.dojo .work-line-tabs > button.on { border-color: var(--we); background: #e5eff1; box-shadow: inset 0 0 0 1px #7898a0; }
+.dojo .new-work-form { margin-top: 12px; padding: 12px; border: 1px dashed #9eb3b8; border-radius: 14px; background: #f4f8f8; }
+.dojo .new-work-form > .primary { width: 100%; margin-top: 10px; }
+.dojo .current-work-card > p { color: var(--muted); font-size: 9px; }
+.dojo .reflection-card { border-color: #bfafa1; background: linear-gradient(150deg, #fffdf8, #f2ece5); }
+.dojo .reflection-choice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin: 6px 0 12px; }
+.dojo .reflection-choice-grid button { min-width: 0; min-height: 44px; padding: 7px; font-size: 9px; line-height: 1.4; }
+.dojo .reflection-choice-grid button.on { border-color: #806d5c; background: #e9dfd2; color: #493e34; font-weight: 750; }
+.dojo .saved-reflection { padding: 12px; border-left: 3px solid #927c67; border-radius: 0 12px 12px 0; background: #f3ece3; }
+.dojo .saved-reflection p { margin: 0; font-size: 11px; line-height: 1.7; white-space: pre-wrap; }
+.dojo .saved-reflection small { display: block; margin-top: 6px; color: #75695e; font-size: 8.5px; }
+.dojo .legacy-upgrade-card { border-color: #cfb47f; background: #fff9ec; }
+.dojo .legacy-upgrade-card p { color: var(--muted); font-size: 10px; line-height: 1.65; }
+
+@media (max-width: 390px) {
+  .dojo .reflection-choice-grid { grid-template-columns: 1fr; }
+  .dojo .work-line-tabs > button { flex-basis: 148px; }
+}
+
+@media (max-width: 390px) {
+  .dojo .format-choice-grid { grid-template-columns: 1fr; }
+  .dojo .format-choice-grid.compact { grid-template-columns: repeat(3, 1fr); }
+  .dojo .weaving-project-row { grid-template-columns: 1fr; }
+  .dojo .weaving-project-row > span { padding: 8px 0 0; border-top: 1px solid #d9e1e4; border-left: 0; }
+  .dojo .publication-save-actions { grid-template-columns: 1fr; }
+}
