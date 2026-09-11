@@ -3853,9 +3853,76 @@
 .dojo .topic-study-history button small { color: var(--muted); font-size: 8.5px; }
 .dojo .topic-study-history button b { margin-top: 2px; font-size: 10px; }
 .dojo .topic-study-history button em { color: #61745a; font-size: 8.5px; font-style: normal; }
+.dojo .topic-study-route {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 5px;
+  margin-top: 12px;
+}
+.dojo .topic-study-route span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 7px 4px;
+  border-radius: 9px;
+  background: #e8eee3;
+  color: #53684e;
+  text-align: center;
+  font-size: 8.5px;
+  font-weight: 750;
+}
+.dojo .topic-study-route b {
+  display: grid;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  border-radius: 999px;
+  background: #65775d;
+  color: #fff;
+  font-size: 8px;
+}
+.dojo .topic-study-route i { color: #8c9687; font-size: 9px; font-style: normal; }
+.dojo .topic-study-launch-actions {
+  display: grid;
+  grid-template-columns: 0.8fr 1.2fr;
+  gap: 8px;
+  margin-top: 11px;
+}
+.dojo .topic-study-launch-actions .topic-study-external,
+.dojo .topic-study-launch-actions .primary {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  margin: 0;
+  padding: 8px;
+  place-items: center;
+  border-radius: 10px;
+  text-align: center;
+  text-decoration: none;
+  font-size: 9.5px;
+}
+.dojo .topic-study-launch-actions .disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+.dojo .topic-study-boundary {
+  display: block;
+  margin-top: 9px;
+  color: var(--muted);
+  font-size: 8.5px;
+  line-height: 1.55;
+}
 
 @media (max-width: 370px) {
-  .dojo .topic-study-create-row { grid-template-columns: 1fr; }
+  .dojo .topic-study-create-row,
+  .dojo .topic-study-launch-actions { grid-template-columns: 1fr; }
+  .dojo .topic-study-route { grid-template-columns: 1fr; }
+  .dojo .topic-study-route i { display: none; }
 }
 
 /* 英文自譯工作台 */
