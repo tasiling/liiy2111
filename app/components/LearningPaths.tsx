@@ -116,7 +116,7 @@ export default function LearningPaths() {
 
       {!editing && <div className="learning-actions"><button className="primary" onClick={startLearning}>◷ 開始這次修習</button><button onClick={() => openQuickAdd({ presetSpace: "practice", presetKind: `學習／${LEARNING_TRACKS[selected].title}` })}>留下修習紀錄</button></div>}
       {!editing && selected === "english" && <EnglishContextRoomBridge onCompleted={load} />}
-      {!editing && selected === "english" && <EnglishTopicStudy onCompleted={load} />}
+      {!editing && selected === "english" && <EnglishTopicStudy />}
       {!editing && selected === "english" && <EnglishJournalWorkbench initialDate={journalDate} onCompleted={load} />}
       {!editing && selected === "english" && <EnglishContextSeedInbox />}
       {!editing && selected === "english" && <div className="learning-resources weekly-learning-progress"><div className="subsection-title"><h4>本週英文兩條路徑</h4><Link href="/bingo">前往週盤 →</Link></div>{weeklyActivities.length === 0 ? <p className="muted-note">本週英文格尚未開始；可從週盤加入英文集中週。</p> : weeklyActivities.map((activity) => <div className="learning-material" key={activity.id}><div><b>{activity.path === "system" ? "系統建置" : "英文修習"}・{activity.skill}・{activity.progress}/{activity.target} {activity.unit}</b><small>{activity.evidenceNote || (activity.completedAt ? "已完成" : "進行中")}</small></div><span>{activity.completedAt ? "✓" : ""}</span></div>)}</div>}
