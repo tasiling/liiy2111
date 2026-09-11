@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { WEAVING_FORMATS, type WeavingFormat } from "@/lib/dojo/weavingProjects";
-import type { WeavingProject } from "@/lib/dojo/weavingProjects";
+import type { WeavingShuttleBundle } from "@/lib/dojo/weavingShuttle";
 import {
   ACTIVE_INSIGHT_STATUSES,
   INSIGHT_TOPICS,
@@ -26,7 +26,7 @@ type InsightSource = { sourceNoteId: string; sourceText: string };
 export default function ReadingCardsPage() {
   const router = useRouter();
   const [cards, setCards] = useState<InsightCardWithBook[]>([]);
-  const [weavingProjects, setWeavingProjects] = useState<WeavingProject[]>([]);
+  const [weavingProjects, setWeavingProjects] = useState<WeavingShuttleBundle[]>([]);
   const [selectedForWeaving, setSelectedForWeaving] = useState<string[]>([]);
   const [projectTitle, setProjectTitle] = useState("");
   const [outputType, setOutputType] = useState<WeavingFormat | null>(null);
@@ -42,12 +42,12 @@ export default function ReadingCardsPage() {
     try {
       const [response, projectsResponse] = await Promise.all([
         fetch("/api/dojo/reading/cards", { cache: "no-store" }),
-        fetch("/api/dojo/weaving-projects", { cache: "no-store" }),
+        fetch("/api/dojo/weaving-shuttles", { cache: "no-store" }),
       ]);
       const json = await readJson<{ cards: InsightCardWithBook[]; todayISO: string }>(response);
-      const projectJson = await readJson<{ projects: WeavingProject[] }>(projectsResponse);
+      const projectJson = await readJson<{ bundles: WeavingShuttleBundle[] }>(projectsResponse);
       setCards(json.cards ?? []);
-      setWeavingProjects(projectJson.projects ?? []);
+      setWeavingProjects(projectJson.bundles ?? []);
       setTodayISO(json.todayISO);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
@@ -64,7 +64,7 @@ export default function ReadingCardsPage() {
   const dueCards = useMemo(() => cards.filter((card) =>
     ACTIVE_INSIGHT_STATUSES.includes(card.status) && Boolean(card.nextVisitAt && card.nextVisitAt <= todayISO)
   ), [cards, todayISO]);
-  const assignedToWeaving = useMemo(() => new Set(weavingProjects.flatMap((project) => project.sourceRefs.filter((ref) => ref.sourceType === "reading_insight").map((ref) => ref.sourceId))), [weavingProjects]);
+  const assignedToWeaving = useMemo(() => new Set(weavingProjects.flatMap((bundle) => bundle.shuttle.sourceRefs.filter((ref) => ref.sourceType === "reading_insight").map((ref) => ref.sourceId))), [weavingProjects]);
   const programCards = useMemo(() => cards.filter((card) =>
     (card.status === "已驗證" || card.status === "不成立") && card.programApplication === "未定" && !assignedToWeaving.has(card.id)
   ), [assignedToWeaving, cards]);
@@ -85,13 +85,13 @@ export default function ReadingCardsPage() {
     setCreatingProject(true);
     setError(null);
     try {
-      const response = await fetch("/api/dojo/weaving-projects", {
+      const response = await fetch("/api/dojo/weaving-shuttles", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ coreStatement: projectTitle, format: outputType, sourceType: "reading_insights", insightCardIds: selectedForWeaving }),
       });
-      const json = await readJson<{ project: WeavingProject }>(response);
-      setWeavingProjects((current) => [json.project, ...current]);
+      const json = await readJson<{ bundle: WeavingShuttleBundle }>(response);
+      setWeavingProjects((current) => [json.bundle, ...current]);
       setSelectedForWeaving([]);
       setProjectTitle("");
       setOutputType(null);
@@ -148,7 +148,7 @@ export default function ReadingCardsPage() {
             <input value={projectTitle} onChange={(event) => setProjectTitle(event.target.value)} placeholder="不是摘要，而是作品真正要說的主張" />
             <label>先做成哪一種形式？</label>
             <div className="reading-output-picker">{Object.entries(WEAVING_FORMATS).map(([key, label]) => <button key={key} className={outputType === key ? "on" : ""} onClick={() => setOutputType(key as WeavingFormat)}>{label}</button>)}</div>
-            <button className="primary" disabled={!outputType || !projectTitle.trim() || creatingProject} onClick={() => void createWeavingProject()}>{creatingProject ? "建立中…" : outputType ? "建立織光案" : "先選擇主要形式"}</button>
+            <button className="primary" disabled={!outputType || !projectTitle.trim() || creatingProject} onClick={() => void createWeavingProject()}>{creatingProject ? "建立中…" : outputType ? "建立織光杼與作品 A" : "先選擇主要形式"}</button>
           </section>}
         </>
       )}

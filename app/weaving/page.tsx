@@ -7,7 +7,7 @@ export default function WeavingPage() {
   return (
     <ModuleDomainPage
       title="織光堂"
-      lead="把採回的素材織成草稿、牌卡、作品與版本。"
+      lead="讓核心經線穿過不同作品，並把創作後的新理解帶回來。"
       space="weaving"
       defaultKind="創作"
       extra={(

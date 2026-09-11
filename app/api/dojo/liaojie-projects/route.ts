@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { LIAOJIE_PROJECT_TITLE_PREFIX, WEAVING_PROJECT_TITLE_PREFIX, parseJson } from "@/lib/dojo/formal";
+import { LIAOJIE_PROJECT_TITLE_PREFIX, WEAVING_PROJECT_TITLE_PREFIX, WEAVING_SHUTTLE_TITLE_PREFIX, WEAVING_WORK_TITLE_PREFIX, parseJson } from "@/lib/dojo/formal";
 import { liaojieProjectContent, liaojieProjectRecordTitle, normalizeLiaojieProject } from "@/lib/dojo/liaojiePublication";
 import { normalizeWeavingProject, weavingProjectContent } from "@/lib/dojo/weavingProjects";
+import { normalizeWeavingShuttle, normalizeWeavingWork, workContent } from "@/lib/dojo/weavingShuttle";
 import { archiveJsonRecordById, listJsonRecords, updateJsonRecordById } from "@/lib/dojo/notionStore";
 import { createKnowledgeEntry } from "@/lib/notion/mutations";
 import { getKnowledgeEntry } from "@/lib/notion/queries";
@@ -33,6 +34,41 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+    const weavingWorkId = typeof body.weavingWorkId === "string" ? body.weavingWorkId : "";
+    const weavingShuttleId = typeof body.weavingShuttleId === "string" ? body.weavingShuttleId : "";
+    if (weavingWorkId || weavingShuttleId) {
+      if (!weavingWorkId || !weavingShuttleId) return NextResponse.json({ error: "缺少織光杼或作品緯線 id" }, { status: 400 });
+      const existing = (await projects()).find((item) => item.weavingWorkId === weavingWorkId);
+      if (existing) return NextResponse.json({ ok: true, project: existing, duplicate: true });
+
+      const [shuttleRow, workRow] = await Promise.all([getKnowledgeEntry(weavingShuttleId), getKnowledgeEntry(weavingWorkId)]);
+      if (!shuttleRow.標題.startsWith(WEAVING_SHUTTLE_TITLE_PREFIX) || !workRow.標題.startsWith(WEAVING_WORK_TITLE_PREFIX)) {
+        return NextResponse.json({ error: "來源不是有效的織光杼與作品緯線" }, { status: 400 });
+      }
+      const shuttle = normalizeWeavingShuttle(parseJson(shuttleRow.內容), { id: weavingShuttleId });
+      const work = normalizeWeavingWork(parseJson(workRow.內容), { id: weavingWorkId });
+      if (!shuttle || !work || work.shuttleId !== shuttle.id) return NextResponse.json({ error: "作品與織光杼的關係無法確認" }, { status: 409 });
+      if (work.status !== "completed" && work.status !== "sent_to_liaojie") {
+        return NextResponse.json({ error: "請先確認這件作品完成，再手動送往聊解室" }, { status: 409 });
+      }
+      const core = shuttle.coreVersions.find((version) => version.id === work.coreVersionId) ?? shuttle.coreVersions[shuttle.coreVersions.length - 1];
+      const project = normalizeLiaojieProject({
+        weavingProjectId: "", weavingShuttleId, weavingWorkId, sourceCoreVersionId: core.id,
+        sourceTitle: work.title, sourceCoreStatement: core.statement,
+        sourceOutputUrl: work.outputUrl, sourceDraftSnapshot: work.finalSnapshot || work.draftText,
+        brandAngle: core.statement, audience: shuttle.audience, platform: "instagram_post",
+        title: work.title, coverCopy: "", summary: "", callToAction: "", themeGroup: "",
+        scheduledOn: null, status: "received", publishedUrl: "", responseNote: "", nextStep: "決定首發平台",
+      }, { id: "pending", touch: true });
+      if (!project) return NextResponse.json({ error: "聊解企劃內容不完整" }, { status: 400 });
+      const created = await createKnowledgeEntry({ 標題: liaojieProjectRecordTitle(crypto.randomUUID()), 內容: JSON.stringify(liaojieProjectContent(project)) });
+      project.id = created.id;
+      const sentAt = new Date().toISOString();
+      const updatedWork = normalizeWeavingWork({ ...work, status: "sent_to_liaojie", sentToLiaojieAt: sentAt, nextAction: "在聊解室完成首發版本" }, { id: work.id, touch: true });
+      if (updatedWork) await updateJsonRecordById(work.id, WEAVING_WORK_TITLE_PREFIX, workRow.標題, workContent(updatedWork));
+      return NextResponse.json({ ok: true, project }, { status: 201 });
+    }
+
     const weavingProjectId = typeof body.weavingProjectId === "string" ? body.weavingProjectId : "";
     if (!weavingProjectId) return NextResponse.json({ error: "缺少織光案 id" }, { status: 400 });
     const existing = (await projects()).find((item) => item.weavingProjectId === weavingProjectId);
@@ -47,7 +83,8 @@ export async function POST(req: NextRequest) {
     }
 
     const project = normalizeLiaojieProject({
-      weavingProjectId, sourceTitle: weaving.title, sourceCoreStatement: weaving.coreStatement,
+      weavingProjectId, weavingShuttleId: "", weavingWorkId: "", sourceCoreVersionId: "",
+      sourceTitle: weaving.title, sourceCoreStatement: weaving.coreStatement,
       sourceOutputUrl: weaving.outputUrl, sourceDraftSnapshot: weaving.draftText,
       brandAngle: weaving.coreStatement, audience: weaving.audience, platform: "instagram_post",
       title: weaving.title, coverCopy: "", summary: "", callToAction: "", themeGroup: "",
@@ -81,7 +118,14 @@ export async function PATCH(req: NextRequest) {
     if (requestedStatus === "published" && !String(body.project?.publishedUrl || previous.publishedUrl || "").trim()) {
       return NextResponse.json({ error: "標記已發布前請先貼上發布連結" }, { status: 409 });
     }
-    const project = normalizeLiaojieProject({ ...previous, ...body.project, weavingProjectId: previous.weavingProjectId, sourceTitle: previous.sourceTitle, sourceCoreStatement: previous.sourceCoreStatement, sourceOutputUrl: previous.sourceOutputUrl, sourceDraftSnapshot: previous.sourceDraftSnapshot, createdAt: previous.createdAt }, { id: body.id, touch: true });
+    const project = normalizeLiaojieProject({
+      ...previous, ...body.project,
+      weavingProjectId: previous.weavingProjectId, weavingShuttleId: previous.weavingShuttleId,
+      weavingWorkId: previous.weavingWorkId, sourceCoreVersionId: previous.sourceCoreVersionId,
+      sourceTitle: previous.sourceTitle, sourceCoreStatement: previous.sourceCoreStatement,
+      sourceOutputUrl: previous.sourceOutputUrl, sourceDraftSnapshot: previous.sourceDraftSnapshot,
+      createdAt: previous.createdAt,
+    }, { id: body.id, touch: true });
     if (!project) return NextResponse.json({ error: "聊解企劃內容不完整" }, { status: 400 });
     await updateJsonRecordById(body.id, LIAOJIE_PROJECT_TITLE_PREFIX, row.標題, liaojieProjectContent(project));
     return NextResponse.json({ ok: true, project });

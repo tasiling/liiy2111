@@ -4,7 +4,8 @@ export const LIAOJIE_PLATFORMS = { plurk: "噗浪", instagram_post: "Instagram �
 export type LiaojiePlatform = keyof typeof LIAOJIE_PLATFORMS;
 export type LiaojieStatus = "received" | "packaging" | "ready" | "scheduled" | "published" | "archived";
 export type LiaojiePublicationProject = {
-  version: 1; recordType: "liaojie-publication-project"; id: string; weavingProjectId: string;
+  version: 2; recordType: "liaojie-publication-project"; id: string;
+  weavingProjectId: string; weavingShuttleId: string; weavingWorkId: string; sourceCoreVersionId: string;
   sourceTitle: string; sourceCoreStatement: string; sourceOutputUrl: string; sourceDraftSnapshot: string;
   brandAngle: string; audience: string; platform: LiaojiePlatform; title: string; coverCopy: string;
   summary: string; callToAction: string; themeGroup: string; scheduledOn: string | null; status: LiaojieStatus;
@@ -15,11 +16,15 @@ function text(value: unknown, max: number) { return typeof value === "string" ? 
 export function liaojieProjectRecordTitle(nonce: string) { return `${LIAOJIE_PROJECT_TITLE_PREFIX}${nonce}`; }
 export function normalizeLiaojieProject(value: unknown, options: { id: string; touch?: boolean }): LiaojiePublicationProject | null {
   const source = value && typeof value === "object" ? value as Record<string, unknown> : {};
-  const weavingProjectId = text(source.weavingProjectId, 300); if (!weavingProjectId) return null;
+  const weavingProjectId = text(source.weavingProjectId, 300);
+  const weavingShuttleId = text(source.weavingShuttleId, 300);
+  const weavingWorkId = text(source.weavingWorkId, 300);
+  if (!weavingProjectId && (!weavingShuttleId || !weavingWorkId)) return null;
   const now = new Date().toISOString(); const createdAt = text(source.createdAt, 50) || now;
   const platform = typeof source.platform === "string" && source.platform in LIAOJIE_PLATFORMS ? source.platform as LiaojiePlatform : "instagram_post";
   return {
-    version: 1, recordType: "liaojie-publication-project", id: options.id, weavingProjectId,
+    version: 2, recordType: "liaojie-publication-project", id: options.id,
+    weavingProjectId, weavingShuttleId, weavingWorkId, sourceCoreVersionId: text(source.sourceCoreVersionId, 100),
     sourceTitle: text(source.sourceTitle, 200), sourceCoreStatement: text(source.sourceCoreStatement, 3000),
     sourceOutputUrl: text(source.sourceOutputUrl, 2000), sourceDraftSnapshot: text(source.sourceDraftSnapshot, 80000),
     brandAngle: text(source.brandAngle, 3000), audience: text(source.audience, 1000), platform,

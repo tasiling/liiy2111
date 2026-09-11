@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { CAPTURE_CATEGORIES, type CaptureEntry } from "@/lib/dojo/formal";
-import { WEAVING_FORMATS, type WeavingFormat, type WeavingProject } from "@/lib/dojo/weavingProjects";
+import { WEAVING_FORMATS, type WeavingFormat } from "@/lib/dojo/weavingProjects";
+import type { WeavingShuttleBundle } from "@/lib/dojo/weavingShuttle";
 
 async function json<T>(response: Response): Promise<T> {
   const value = await response.json().catch(() => ({}));
@@ -46,19 +47,20 @@ function CaptureProjectStarter({ capture, open, onOpen, onClose }: { capture: Ca
     if (!coreStatement.trim()) { setError("請先寫下這次最想說的一句話。"); return; }
     setSaving(true); setError(null);
     try {
-      const response = await fetch("/api/dojo/weaving-projects", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sourceType: "forage_capture", sourceId: capture.id, coreStatement, format }) });
-      const result = await json<{ project: WeavingProject }>(response);
-      window.location.href = `/weaving/${result.project.id}`;
+      const response = await fetch("/api/dojo/weaving-shuttles", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sourceType: "forage_capture", sourceId: capture.id, coreStatement, format }) });
+      const result = await json<{ bundle: WeavingShuttleBundle }>(response);
+      const work = result.bundle.works[0];
+      window.location.href = `/weaving/${result.bundle.shuttle.id}${work ? `?work=${encodeURIComponent(work.id)}` : ""}`;
     } catch (caught) { setError(caught instanceof Error ? caught.message : String(caught)); setSaving(false); }
   }
   return <article className="weaving-capture-card">
     <div className="weaving-capture-meta"><span>{capture.category ? CAPTURE_CATEGORIES[capture.category] : "未分類"} · {capture.processingDepth === "deep" ? "深整理" : "輕整理"}</span></div>
     <h3>{capture.title}</h3><p className="weaving-excerpt">{capture.forageSummary || capture.excerpt}</p>
-    {!open ? <button className="weaving-edit-button" onClick={onOpen}>用這份素材建立織光案</button> : <div className="weaving-editor">
+    {!open ? <button className="weaving-edit-button" onClick={onOpen}>用這份素材建立織光杼</button> : <div className="weaving-editor">
       <div className="weaving-editor-heading"><b>這次只建立一條作品路徑</b><button className="text-link" onClick={onClose}>收起</button></div>
       <label>最想說的一句話</label><textarea className="field" rows={3} value={coreStatement} onChange={(event) => setCoreStatement(event.target.value)} placeholder="不是摘要，而是這次作品真正要說的主張。" />
       <label>先做成哪一種形式？</label><div className="format-choice-grid compact">{Object.entries(WEAVING_FORMATS).map(([key, label]) => <button key={key} className={format === key ? "on" : ""} onClick={() => setFormat(key as WeavingFormat)}>{label}</button>)}</div>
-      {error && <p className="form-error">{error}</p>}<button className="primary production-save" disabled={saving} onClick={() => void create()}>{saving ? "建立中…" : "建立織光案"}</button>
+      {error && <p className="form-error">{error}</p>}<button className="primary production-save" disabled={saving} onClick={() => void create()}>{saving ? "建立中…" : "建立織光杼與作品 A"}</button>
     </div>}
   </article>;
 }
