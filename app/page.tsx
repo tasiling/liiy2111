@@ -208,9 +208,25 @@ export default function TodayPage() {
           touches: selected
             ? current.englishRhythm.touches.filter((item) => item !== touch)
             : [...current.englishRhythm.touches, touch],
+          vocabForgeRounds: touch === "vocabulary"
+            ? selected ? 0 : Math.max(1, current.englishRhythm.vocabForgeRounds)
+            : current.englishRhythm.vocabForgeRounds,
         },
       };
     });
+  }
+
+  function setVocabForgeRounds(rounds: 1 | 3 | 5) {
+    setRecord((current) => ({
+      ...current,
+      englishRhythm: {
+        ...current.englishRhythm,
+        touches: current.englishRhythm.touches.includes("vocabulary")
+          ? current.englishRhythm.touches
+          : [...current.englishRhythm.touches, "vocabulary"],
+        vocabForgeRounds: rounds,
+      },
+    }));
   }
 
   async function saveEnglishRhythm() {
@@ -660,6 +676,26 @@ export default function TodayPage() {
                   );
                 })}
               </div>
+              <div className="vocabforge-rounds">
+                <div>
+                  <b>VocabForge 科學複習</b>
+                  <small>每輪 5 個單字；主動回想依系統排程出現</small>
+                </div>
+                <div className="vocabforge-round-options" aria-label="今天完成的 VocabForge 輪數">
+                  {([1, 3, 5] as const).map((rounds) => (
+                    <button
+                      type="button"
+                      key={rounds}
+                      className={record.englishRhythm.vocabForgeRounds === rounds ? "on" : ""}
+                      aria-pressed={record.englishRhythm.vocabForgeRounds === rounds}
+                      onClick={() => setVocabForgeRounds(rounds)}
+                    >
+                      <b>{rounds} 輪</b>
+                      <small>{rounds === 1 ? "今日有碰" : rounds === 3 ? "今日淬煉" : "今日深煉"}</small>
+                    </button>
+                  ))}
+                </div>
+              </div>
               <label htmlFor="english-rhythm-note">今天留下什麼？（選填）</label>
               <input
                 id="english-rhythm-note"
@@ -733,6 +769,7 @@ export default function TodayPage() {
               <div className="evening-english-summary" aria-label="今日英文微觸摘要">
                 <span>日常節奏 · 英文微觸</span>
                 <b>{englishTouchLabels.join("、")} · {englishTouchCount} 項</b>
+                {record.englishRhythm.vocabForgeRounds > 0 && <small>VocabForge {record.englishRhythm.vocabForgeRounds} 輪 · {record.englishRhythm.vocabForgeRounds * 5} 個單字席次</small>}
                 {record.englishRhythm.note && <small>{record.englishRhythm.note}</small>}
               </div>
             )}

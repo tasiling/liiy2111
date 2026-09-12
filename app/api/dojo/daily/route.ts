@@ -7,6 +7,7 @@ import {
   taipeiTodayISO,
 } from "@/lib/dojo/formal";
 import { readJsonRecord, upsertJsonRecord } from "@/lib/dojo/notionStore";
+import { syncVocabForgeWeeklyBingo } from "@/lib/dojo/englishRhythm";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +33,8 @@ export async function PUT(req: NextRequest) {
     const raw = typeof body.record === "string" ? parseJson(body.record) : body.record;
     const record = normalizeDailyRecord(raw, date);
     const saved = await upsertJsonRecord(dailyRecordTitle(date), record);
-    return NextResponse.json({ ok: true, id: saved.id, record });
+    const vocabForgeWeek = await syncVocabForgeWeeklyBingo(date);
+    return NextResponse.json({ ok: true, id: saved.id, record, vocabForgeWeek: vocabForgeWeek.summary });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }

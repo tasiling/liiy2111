@@ -16,6 +16,7 @@ import EnglishJournalWorkbench from "./EnglishJournalWorkbench";
 import EnglishTopicStudy from "./EnglishTopicStudy";
 import EnglishContextSeedInbox from "./EnglishContextSeedInbox";
 import EnglishContextRoomBridge from "./EnglishContextRoomBridge";
+import EnglishRhythmWeek from "./EnglishRhythmWeek";
 
 async function responseJson<T>(response: Response): Promise<T> {
   const json = await response.json().catch(() => ({}));
@@ -115,11 +116,12 @@ export default function LearningPaths() {
       </div>}
 
       {!editing && <div className="learning-actions"><button className="primary" onClick={startLearning}>◷ 開始這次修習</button><button onClick={() => openQuickAdd({ presetSpace: "practice", presetKind: `學習／${LEARNING_TRACKS[selected].title}` })}>留下修習紀錄</button></div>}
+      {!editing && selected === "english" && <EnglishRhythmWeek />}
       {!editing && selected === "english" && <EnglishContextRoomBridge onCompleted={load} />}
       {!editing && selected === "english" && <EnglishTopicStudy />}
       {!editing && selected === "english" && <EnglishJournalWorkbench initialDate={journalDate} onCompleted={load} />}
       {!editing && selected === "english" && <EnglishContextSeedInbox />}
-      {!editing && selected === "english" && <div className="learning-resources weekly-learning-progress"><div className="subsection-title"><h4>本週英文兩條路徑</h4><Link href="/bingo">前往週盤 →</Link></div>{weeklyActivities.length === 0 ? <p className="muted-note">本週尚未安排英文深度成果；可從週盤加入 3＋1 格範本。</p> : weeklyActivities.map((activity) => <div className="learning-material" key={activity.id}><div><b>{activity.path === "system" ? "系統建置" : "英文修習"}・{activity.skill}・{activity.progress}/{activity.target} {activity.unit}</b><small>{activity.evidenceNote || (activity.completedAt ? "已完成" : "進行中")}</small></div><span>{activity.completedAt ? "✓" : ""}</span></div>)}</div>}
+      {!editing && selected === "english" && <div className="learning-resources weekly-learning-progress"><div className="subsection-title"><h4>本週英文 6＋2 成果</h4><Link href="/bingo">前往週盤 →</Link></div>{weeklyActivities.length === 0 ? <p className="muted-note">本週尚未安排英文深度成果；可從週盤加入 6＋2 格範本。</p> : weeklyActivities.map((activity) => <div className="learning-material" key={activity.id}><div><b>{activity.path === "system" ? "系統建置" : "英文修習"}・{activity.skill}・{activity.progress}/{activity.target} {activity.unit}</b><small>{activity.evidenceNote || (activity.completedAt ? "已完成" : "進行中")}</small></div><span>{activity.completedAt ? "✓" : ""}</span></div>)}</div>}
       {!editing && <div className="learning-resources"><div className="subsection-title"><h4>從野採送來的素材</h4><span>{trackMaterials.length}</span></div>{trackMaterials.length === 0 ? <p className="muted-note">目前沒有待學素材；可在野採將材料連到這條路徑。</p> : trackMaterials.map((material) => <div className="learning-material" key={material.id}><div><b>{material.title}</b><small>{material.forageSummary || material.excerpt || "尚未留下摘要"}</small></div>{material.sourceUrl && <a href={material.sourceUrl} target="_blank" rel="noreferrer">來源 ↗</a>}</div>)}</div>}
       {!editing && recentEntries.length > 0 && <div className="learning-resources"><div className="subsection-title"><h4>最近修習</h4></div>{recentEntries.map((entry) => <div className="learning-material" key={entry.id}><div><b>{entry.title}</b><small>{entry.date}{entry.note ? `・${entry.note}` : ""}</small></div></div>)}</div>}
     </article>}

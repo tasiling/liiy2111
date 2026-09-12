@@ -448,6 +448,7 @@ function DailyReviewCard({
                 .filter((touch) => record.englishRhythm.touches.includes(touch))
                 .map((touch) => ENGLISH_TOUCH_TYPES[touch].label)
                 .join("、")}</b>
+              {record.englishRhythm.vocabForgeRounds > 0 && <p>VocabForge {record.englishRhythm.vocabForgeRounds} 輪 · {record.englishRhythm.vocabForgeRounds * 5} 個單字席次</p>}
               {record.englishRhythm.note && <p>{record.englishRhythm.note}</p>}
             </div>
           </>
