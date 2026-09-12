@@ -31,6 +31,7 @@ import {
 } from "./notionStore";
 
 type StoredContextResult = ContextRoomResult & { id: string };
+const CONTEXT_ACTIVITY_PRACTICE_TYPES = new Set(["context-room", "class-topic", "reading", "context-chat"]);
 
 function recordHash(value: string): string {
   return createHash("sha256").update(value).digest("hex").slice(0, 24);
@@ -76,7 +77,8 @@ export async function listContextActivityCandidates(): Promise<ContextActivityCa
       cell.completed ||
       cell.completion.target !== 1 ||
       cell.learning?.trackKey !== "english" ||
-      (cell.learning.path ?? "practice") !== "practice"
+      (cell.learning.path ?? "practice") !== "practice" ||
+      !CONTEXT_ACTIVITY_PRACTICE_TYPES.has(cell.learning.practiceType ?? "")
     ) return [];
     return [{
       id: activityId(weekStart, cell.index, cell.learning.templateKey),
@@ -138,6 +140,9 @@ async function completeExactActivity(result: StoredContextResult): Promise<{ act
     (cell.learning.path ?? "practice") !== "practice" ||
     cell.completion.target !== 1
   ) throw new Error("這項英文活動已變更，請重新選擇尚未完成的活動");
+  if (target.templateKey === "context-room-deep-practice" && !result.secondTakeCompleted) {
+    throw new Error("新版語境修習格需要完成 Second Take／Revised Draft 後才能完成");
+  }
 
   const completedAt = cell.completedAt ?? new Date().toISOString();
   if (!cell.completed) {

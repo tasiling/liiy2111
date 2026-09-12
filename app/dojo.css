@@ -2060,20 +2060,27 @@
 .dojo .english-week-planner-head { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 14px; border: 0; border-radius: 0; background: #eaf0f4; text-align: left; }
 .dojo .english-week-planner-head small,
 .dojo .english-week-planner-head b { display: block; }
+.dojo .english-week-planner-head > span { min-width: 0; }
 .dojo .english-week-planner-head small { color: #668096; font-size: 9px; }
 .dojo .english-week-planner-head b { margin-top: 3px; color: #304c64; font-size: 14px; }
-.dojo .english-week-planner-head em { color: #56728d; font-size: 10px; font-style: normal; font-weight: 800; }
+.dojo .english-week-planner-head em { flex: 0 0 auto; max-width: 42%; color: #56728d; font-size: 10px; font-style: normal; font-weight: 800; text-align: right; }
 .dojo .english-week-planner-body { padding: 12px; }
 .dojo .english-week-planner-body > p { margin: 0 0 8px; color: var(--muted); font-size: 10px; line-height: 1.55; }
 .dojo .english-candidate-group { margin-top: 10px; padding: 8px 10px 2px; border: 1px solid #d9e2e7; border-radius: 12px; background: #fbfdfe; }
 .dojo .english-candidate-group h3 { margin: 0 0 2px; color: #4c6a80; font-size: 10px; }
+.dojo .english-candidate-group-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.dojo .english-candidate-group-heading button { min-height: 30px; padding: 4px 8px; border-color: #9cb0bf; color: #526f84; font-size: 8.5px; }
+.dojo .english-candidate-group-heading button.on { background: #56728d; color: #fff; }
+.dojo .english-week-planner-body .english-template-legacy-note { padding: 9px 10px; border: 1px solid #dfc99f; border-radius: 10px; background: #fff8e9; color: #725b35; }
 .dojo .english-week-planner-body article { padding: 9px 0; border-top: 1px solid #e5e9eb; }
 .dojo .english-week-planner-body article > div:first-child b,
 .dojo .english-week-planner-body article > div:first-child small { display: block; }
 .dojo .english-week-planner-body article > div:first-child b { font-size: 11.5px; }
 .dojo .english-week-planner-body article > div:first-child small { margin-top: 2px; color: var(--muted); font-size: 9px; }
 .dojo .english-week-planner-body article.already-added { display: flex; justify-content: space-between; gap: 8px; opacity: .68; }
-.dojo .english-week-planner-body article.already-added > span { color: #56728d; font-size: 9px; font-weight: 700; }
+.dojo .english-week-planner-body article.optional-muted { opacity: .5; }
+.dojo .english-week-planner-body article.already-added > div { min-width: 0; }
+.dojo .english-week-planner-body article.already-added > span { flex: 0 0 auto; color: #56728d; font-size: 9px; font-weight: 700; white-space: nowrap; }
 .dojo .candidate-colors { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-top: 7px; }
 .dojo .candidate-colors button { min-height: 32px; padding: 4px; font-size: 9px; }
 .dojo .candidate-colors button.important { border-color: var(--task-important); background: var(--task-important-soft); }
