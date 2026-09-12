@@ -443,7 +443,7 @@ function DailyReviewCard({
           <>
             <h3>日常節奏</h3>
             <div className="review-english-rhythm">
-              <small>英文微觸 · {record.englishRhythm.touches.length} 項</small>
+              <small>英文光步 · {record.englishRhythm.touches.length} 步</small>
               <b>{ENGLISH_TOUCH_ORDER
                 .filter((touch) => record.englishRhythm.touches.includes(touch))
                 .map((touch) => ENGLISH_TOUCH_TYPES[touch].label)

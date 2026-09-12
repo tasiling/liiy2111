@@ -67,11 +67,11 @@ function isThursday(dateISO: string) {
 }
 
 function englishRhythmStatus(count: number) {
-  if (count === 0) return "今天還沒碰也沒關係";
-  if (count === 1) return "已輕輕碰到 1 項";
+  if (count === 0) return "今天還沒有走出英文光步，也沒關係";
+  if (count === 1) return "今天已走出 1 步";
   if (count === 2) return "今日基準完成";
-  if (count === 3) return "今天有多元接觸";
-  return "四個方向都碰到了";
+  if (count === 3) return "今天多走了 1 步";
+  return "今天走完 4 步，四種英文都有接觸";
 }
 
 async function readResponse<T>(response: Response): Promise<T> {
@@ -238,7 +238,7 @@ export default function TodayPage() {
       },
     };
     try {
-      await persist(next, "今天的英文微觸已存下來；不占三件事名額。" );
+      await persist(next, "今天的英文光步已存下來；不占三件事名額。" );
     } catch {
       // persist() 已顯示錯誤。
     }
@@ -648,8 +648,8 @@ export default function TodayPage() {
             <summary>
               <div>
                 <span className="eyebrow">日常節奏</span>
-                <h2>英文微觸</h2>
-                <small>{isThursday(date) ? "週四休養日・輕輕碰到就好" : "基準 2 項，狀態好可到 4 項"}</small>
+                <h2>英文光步</h2>
+                <small>{isThursday(date) ? "週四休養日・走一步也很好" : "基準走 2 步，狀態好可到 4 步"}</small>
               </div>
               <span className={`english-rhythm-count ${englishTouchCount >= 2 ? "reached" : ""}`}>
                 {englishTouchCount}/{englishTouchCount > 2 ? 4 : 2}
@@ -708,7 +708,7 @@ export default function TodayPage() {
                 placeholder="一句理解、一個說法，或下次想延續的素材"
               />
               <button type="button" className="primary" disabled={saving} onClick={() => void saveEnglishRhythm()}>
-                {saving ? "儲存中…" : "儲存英文微觸"}
+                {saving ? "儲存中…" : "儲存英文光步"}
               </button>
             </div>
           </details>
@@ -766,9 +766,9 @@ export default function TodayPage() {
             </div>
 
             {englishTouchCount > 0 && (
-              <div className="evening-english-summary" aria-label="今日英文微觸摘要">
-                <span>日常節奏 · 英文微觸</span>
-                <b>{englishTouchLabels.join("、")} · {englishTouchCount} 項</b>
+              <div className="evening-english-summary" aria-label="今日英文光步摘要">
+                <span>日常節奏 · 英文光步</span>
+                <b>{englishTouchLabels.join("、")} · {englishTouchCount} 步</b>
                 {record.englishRhythm.vocabForgeRounds > 0 && <small>VocabForge {record.englishRhythm.vocabForgeRounds} 輪 · {record.englishRhythm.vocabForgeRounds * 5} 個單字席次</small>}
                 {record.englishRhythm.note && <small>{record.englishRhythm.note}</small>}
               </div>

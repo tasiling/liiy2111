@@ -198,7 +198,7 @@ function CalendarReviewCell({ record, showEmpty = false }: { record?: DailyRecor
 function EnglishRhythmMarks({ record }: { record: DailyRecord }) {
   const order = ["input", "output", "vocabulary", "transfer"] as const;
   return (
-    <span className="calendar-english-marks" aria-label={`英文微觸 ${record.englishRhythm.touches.length} 項`}>
+    <span className="calendar-english-marks" aria-label={`英文光步 ${record.englishRhythm.touches.length} 步`}>
       {order.map((touch) => <i key={touch} className={record.englishRhythm.touches.includes(touch) ? "on" : ""} />)}
     </span>
   );
@@ -496,7 +496,7 @@ function DailyReviewSummary({ date, record, today }: { date: string; record?: Da
 
       {record && record.englishRhythm.touches.length > 0 && (
         <div className="calendar-english-summary">
-          <span>英文微觸</span>
+          <span>英文光步</span>
           <strong>{record.englishRhythm.touches.length}/4 · {record.englishRhythm.touches.map((touch) => ENGLISH_TOUCH_TYPES[touch].label).join("、")}</strong>
           {record.englishRhythm.vocabForgeRounds > 0 && <small>VocabForge {record.englishRhythm.vocabForgeRounds} 輪 · {record.englishRhythm.vocabForgeRounds * 5} 個單字席次</small>}
           {record.englishRhythm.note && <small>{record.englishRhythm.note}</small>}
