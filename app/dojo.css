@@ -2282,7 +2282,7 @@
   justify-content: center;
 }
 .dojo .calendar-rich .calendar-date-row > b {
-  font-size: 13px;
+  font-size: 11px;
   line-height: 20px;
   text-align: center;
 }
@@ -2293,8 +2293,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 21px;
-  height: 21px;
+  width: 18px;
+  height: 18px;
+  font-size: 10.5px;
   border-radius: 50%;
   background: #4d6557;
   color: white;
@@ -2328,9 +2329,9 @@
   font-size: 8px;
   line-height: 1;
 }
-.dojo .calendar-english-marks { display: grid; grid-template-columns: repeat(4, 4px); gap: 2px; min-height: 4px; margin-top: 1px; }
-.dojo .calendar-english-marks i { width: 4px; height: 4px; border: 1px solid #d5ddd3; border-radius: 50%; background: transparent; }
-.dojo .calendar-english-marks i.on { background: #6f836f; }
+.dojo .calendar-english-marks { display: grid; grid-template-columns: repeat(4, 7px); gap: 3px; min-height: 3px; margin-top: 2px; }
+.dojo .calendar-english-marks i { width: 7px; height: 3px; border-radius: 999px; background: #d0d9ce; }
+.dojo .calendar-english-marks i.on { background: #607860; }
 .dojo .calendar-review-mark {
   width: 24px;
   height: 24px;
