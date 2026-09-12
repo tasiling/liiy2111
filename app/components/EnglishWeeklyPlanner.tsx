@@ -164,7 +164,7 @@ export default function EnglishWeeklyPlanner({
       </button>
       {open && (
         <div className="english-week-planner-body">
-          <p>每日微觸留在「日常節奏」，不占週盤。這裡把本週主題與自主素材各拆成理解、表達兩個成果，再加上詞彙淬煉與真實轉用；日記自譯、跨日回訪可自由選配。目前階段：{english.english?.weeklyMode === "vocabulary-growth" ? "後三個月・詞彙擴充" : "前三個月・書面習慣建立"}。</p>
+          <p>每日英文光步留在「日常節奏」，不占週盤。這裡把本週主題與自主素材各拆成理解、表達兩個成果，再加上詞彙淬煉與真實轉用；日記自譯、跨日回訪可自由選配。目前階段：{english.english?.weeklyMode === "vocabulary-growth" ? "後三個月・詞彙擴充" : "前三個月・書面習慣建立"}。</p>
           {hasLegacyPlan && <p className="english-template-legacy-note">本週已有舊版英文範本，因此保持原盤面不變。請在下一個空白週套用新版 6＋2。</p>}
           {!hasLegacyPlan && <div className="english-week-lines">
             <label>主題線 A<input className="field" value={topicLine} onChange={(event) => setTopicLine(event.target.value.slice(0, 90))} placeholder="例如：Past Experiences／VoiceTube" /></label>

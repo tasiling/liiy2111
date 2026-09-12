@@ -53,13 +53,13 @@ export default function EnglishRhythmWeek() {
   return (
     <section className="english-rhythm-week">
       <div className="subsection-title">
-        <div><small>日常節奏</small><h4>本週英文節奏</h4></div>
+        <div><small>日常節奏</small><h4>本週英文光步</h4></div>
         <Link href="/calendar">看行事曆 →</Link>
       </div>
-      {loading ? <p className="muted-note">正在整理這週的英文微觸…</p> : error ? <p className="form-error">{error}</p> : <>
+      {loading ? <p className="muted-note">正在整理這週的英文光步…</p> : error ? <p className="form-error">{error}</p> : <>
         <div className="english-week-stats">
-          <div><b>{touchedDays}<small>/7 天</small></b><span>有接觸</span></div>
-          <div><b>{baseDays}<small> 天</small></b><span>達成 2 項</span></div>
+          <div><b>{touchedDays}<small>/7 天</small></b><span>走過光步</span></div>
+          <div><b>{baseDays}<small> 天</small></b><span>走到基準</span></div>
           <div><b>{vocabForgeRounds}<small> 輪</small></b><span>VocabForge</span></div>
         </div>
         <div className="english-week-days">
@@ -69,7 +69,7 @@ export default function EnglishRhythmWeek() {
             return <div key={day} className={day === today ? "today" : ""}>
               <small>{WEEKDAYS[index]}{index === 3 ? "・休" : ""}</small>
               <b>{count}/4</b>
-              <span aria-label={`${count} 項英文微觸`}>{TOUCH_ORDER.map((touch) => <i key={touch} className={rhythm?.touches.includes(touch) ? "on" : ""} />)}</span>
+              <span aria-label={`${count} 步英文光步`}>{TOUCH_ORDER.map((touch) => <i key={touch} className={rhythm?.touches.includes(touch) ? "on" : ""} />)}</span>
               {(rhythm?.vocabForgeRounds ?? 0) > 0 && <em>VF {rhythm!.vocabForgeRounds}</em>}
             </div>;
           })}
