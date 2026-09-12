@@ -88,6 +88,17 @@ export type DayLog = {
 export type EveningDepth = "light" | "medium" | "deep";
 export type MorningDepth = EveningDepth;
 export type ClosingDisposition = "carry" | "journal" | "pause";
+export type EnglishTouchType = "input" | "output" | "vocabulary" | "transfer";
+
+export const ENGLISH_TOUCH_TYPES: Record<
+  EnglishTouchType,
+  { label: string; examples: string }
+> = {
+  input: { label: "輸入", examples: "影片、閱讀、影集、遊戲" },
+  output: { label: "輸出", examples: "自譯、口說、話題回答" },
+  vocabulary: { label: "詞彙", examples: "VocabForge" },
+  transfer: { label: "轉用", examples: "工作、課堂、生活" },
+};
 
 export type DailyRecord = {
   version: 1;
@@ -103,6 +114,11 @@ export type DailyRecord = {
     startedAt: string | null;
   };
   tasks: Record<DailyTaskCategory, DailyTask>;
+  englishRhythm: {
+    touches: EnglishTouchType[];
+    note: string;
+    updatedAt: string | null;
+  };
   daytime: {
     logs: DayLog[];
     note: string;
@@ -387,6 +403,7 @@ export function emptyDailyRecord(date = taipeiTodayISO()): DailyRecord {
       hobby: emptyTask("hobby"),
       health: emptyTask("health"),
     },
+    englishRhythm: { touches: [], note: "", updatedAt: null },
     daytime: { logs: [], note: "" },
     evening: {
       depth: null,
@@ -438,6 +455,9 @@ export function normalizeDailyRecord(value: unknown, expectedDate: string): Dail
   const daytime = source.daytime && typeof source.daytime === "object" ? source.daytime : base.daytime;
   const evening = source.evening && typeof source.evening === "object" ? source.evening : base.evening;
   const tasks = source.tasks && typeof source.tasks === "object" ? source.tasks : base.tasks;
+  const englishRhythm = source.englishRhythm && typeof source.englishRhythm === "object"
+    ? source.englishRhythm
+    : base.englishRhythm;
   const state = morning.state === "低" || morning.state === "穩" || morning.state === "亮" ? morning.state : null;
   const explicitMorningDepth = morning.depth === "light" || morning.depth === "medium" || morning.depth === "deep"
     ? morning.depth
@@ -489,6 +509,16 @@ export function normalizeDailyRecord(value: unknown, expectedDate: string): Dail
       important: normalizeTask(tasks.important, "important"),
       hobby: normalizeTask(tasks.hobby, "hobby"),
       health: normalizeTask(tasks.health, "health"),
+    },
+    englishRhythm: {
+      touches: Array.isArray(englishRhythm.touches)
+        ? Array.from(new Set(englishRhythm.touches.filter(
+            (item): item is EnglishTouchType =>
+              item === "input" || item === "output" || item === "vocabulary" || item === "transfer"
+          ))).slice(0, 4)
+        : [],
+      note: stringValue(englishRhythm.note).slice(0, 1000),
+      updatedAt: nullableString(englishRhythm.updatedAt),
     },
     daytime: { logs, note: stringValue(daytime.note).slice(0, 10000) },
     evening: {

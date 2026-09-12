@@ -10,6 +10,7 @@ import {
 } from "@/lib/dojo/constants";
 import {
   DAILY_TASK_CATEGORIES,
+  ENGLISH_TOUCH_TYPES,
   taipeiTodayISO,
   type DailyRecord,
   type DailyTaskCategory,
@@ -21,6 +22,7 @@ import { JOURNAL_QUESTIONS, type JournalQuestionKey } from "@/lib/journal/notion
 import type { CreativePracticeRecord, ManifestationMilestone } from "@/lib/dojo/manifestation";
 
 const TASK_ORDER: DailyTaskCategory[] = ["important", "hobby", "health"];
+const ENGLISH_TOUCH_ORDER = ["input", "output", "vocabulary", "transfer"] as const;
 const EVENING_DISPOSITION_LABELS = {
   carry: "帶回",
   journal: "寫下今天",
@@ -434,6 +436,20 @@ function DailyReviewCard({
                 </div>
               );
             })}
+          </>
+        )}
+
+        {record && record.englishRhythm.touches.length > 0 && (
+          <>
+            <h3>日常節奏</h3>
+            <div className="review-english-rhythm">
+              <small>英文微觸 · {record.englishRhythm.touches.length} 項</small>
+              <b>{ENGLISH_TOUCH_ORDER
+                .filter((touch) => record.englishRhythm.touches.includes(touch))
+                .map((touch) => ENGLISH_TOUCH_TYPES[touch].label)
+                .join("、")}</b>
+              {record.englishRhythm.note && <p>{record.englishRhythm.note}</p>}
+            </div>
           </>
         )}
 
