@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CAPTURE_CATEGORIES,
+  CAPTURE_CLIP_PURPOSES,
   CAPTURE_CONTENT_TYPES,
   KNOWLEDGE_RELATIONS,
   type CaptureDestination,
@@ -116,6 +118,7 @@ function ForageCard({ capture, editing, onEdit, onCancel, onSaved }: {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const categoryLabel = capture.category ? CAPTURE_CATEGORIES[capture.category] : "未分類";
+  const purposeLabel = CAPTURE_CLIP_PURPOSES[capture.clip.purpose];
 
   function toggleDestination(destination: CaptureDestination) {
     setDraft((current) => ({ ...current, destinations: current.destinations.includes(destination)
@@ -160,8 +163,10 @@ function ForageCard({ capture, editing, onEdit, onCancel, onSaved }: {
 
   return (
     <article className={`forage-card depth-${capture.processingDepth}`}>
-      <div className="weaving-capture-meta"><span>{categoryLabel} · {capture.processingDepth === "raw" ? "原始擷取" : capture.processingDepth === "light" ? "輕整理" : "深整理"}</span><time>{capturedTime(capture.capturedAt)}</time></div>
+      <div className="weaving-capture-meta"><span>{capture.clip.origin === "line" ? `LINE 剪藏 · ${purposeLabel}` : categoryLabel} · {capture.processingDepth === "raw" ? "原始擷取" : capture.processingDepth === "light" ? "輕整理" : "深整理"}</span><time>{capturedTime(capture.capturedAt)}</time></div>
       <h3>{capture.title}</h3>
+      {capture.clip.origin === "line" && <div className="forage-clip-source"><span>{capture.clip.sourceKind === "screenshot" ? "截圖" : "網頁"}</span><span>{capture.clip.platform || "LINE"}</span>{capture.clip.webPreview.status === "unavailable" && <span>僅保存網址</span>}</div>}
+      {capture.clip.attachments.length > 0 && <div className="forage-clip-images">{capture.clip.attachments.map((attachment) => <a key={attachment.id} href={`/api/dojo/captures/${capture.id}/images/${attachment.blockId}`} target="_blank" rel="noreferrer"><Image src={`/api/dojo/captures/${capture.id}/images/${attachment.blockId}`} alt="LINE 剪藏原始截圖" width={720} height={480} unoptimized /></a>)}</div>}
       {capture.excerpt && <p className="weaving-excerpt">{capture.excerpt}</p>}
       {capture.note && <div className="weaving-original-note"><b>擷取時的想法</b><p>{capture.note}</p></div>}
       {capture.sourceUrl && <a className="weaving-source" href={capture.sourceUrl} target="_blank" rel="noreferrer">↗ {sourceHost(capture.sourceUrl)}</a>}
@@ -176,6 +181,7 @@ function ForageCard({ capture, editing, onEdit, onCancel, onSaved }: {
           <select className="field" value={draft.category ?? ""} onChange={(event) => setDraft({ ...draft, category: event.target.value ? event.target.value as CaptureEntry["category"] : null })}>
             <option value="">暫不分類</option>{Object.entries(CAPTURE_CATEGORIES).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
           </select>
+          {capture.clip.origin === "line" && <><label>當初為什麼收藏？</label><select className="field" value={draft.clip.purpose} onChange={(event) => setDraft({ ...draft, clip: { ...draft.clip, purpose: event.target.value as CaptureEntry["clip"]["purpose"] } })}>{Object.entries(CAPTURE_CLIP_PURPOSES).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></>}
           <label>使用去向（可複選）</label>
           <div className="destination-grid">{DESTINATIONS.map((item) => <button type="button" key={item.key} className={draft.destinations.includes(item.key) ? "on" : ""} onClick={() => toggleDestination(item.key)}><b>{item.label}</b><small>{item.hint}</small></button>)}</div>
           {draft.destinations.includes("practice") && <><label>連到哪些學習項目？（可複選）</label><div className="learning-chip-row">{Object.entries(LEARNING_TRACKS).map(([key, config]) => <button type="button" key={key} className={draft.learningTracks.includes(key as LearningTrackKey) ? "on" : ""} onClick={() => toggleTrack(key as LearningTrackKey)}>{config.title}</button>)}</div></>}

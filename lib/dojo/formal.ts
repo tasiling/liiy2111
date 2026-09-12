@@ -222,6 +222,48 @@ export const CAPTURE_CATEGORIES = {
 
 export type CaptureCategoryKey = keyof typeof CAPTURE_CATEGORIES;
 
+// LINE 剪藏的「用途」與野採的主題分類分開保存。用途回答為什麼先留下這份
+// 素材；category 仍由野採在整理時判斷它屬於哪個知識領域。
+export const CAPTURE_CLIP_PURPOSES = {
+  contentOpinion: "內容觀點",
+  visualReference: "視覺參考",
+  learningMaterial: "學習資料",
+  researchLater: "待研究",
+  saveFirst: "先收著",
+} as const;
+
+export type CaptureClipPurpose = keyof typeof CAPTURE_CLIP_PURPOSES;
+export type CaptureOrigin = "manual" | "line";
+export type CaptureSourceKind = "note" | "webpage" | "screenshot";
+
+export type CaptureAttachment = {
+  id: string;
+  kind: "image";
+  storage: "notion";
+  blockId: string;
+  filename: string;
+  mimeType: string;
+  sourceMessageId: string;
+  createdAt: string;
+};
+
+export type CaptureClipMeta = {
+  origin: CaptureOrigin;
+  purpose: CaptureClipPurpose;
+  sourceKind: CaptureSourceKind;
+  platform: string;
+  externalEventId: string;
+  externalMessageId: string;
+  awaitingScreenshotUntil: string | null;
+  webPreview: {
+    description: string;
+    imageUrl: string;
+    fetchedAt: string | null;
+    status: "none" | "ready" | "partial" | "unavailable";
+  };
+  attachments: CaptureAttachment[];
+};
+
 export const CAPTURE_CONTENT_TYPES = {
   atomic: ["原子概念", "一個可以獨立理解、重複使用的知識點"],
   inspiration: ["靈感", "尚未成形，但值得保留的創作火花"],
@@ -282,6 +324,7 @@ export type CaptureEntry = {
   excerpt: string;
   note: string;
   sourceUrl: string;
+  clip: CaptureClipMeta;
   status: CaptureStatus;
   processingDepth: CaptureProcessingDepth;
   contentType: CaptureContentType | null;
@@ -760,6 +803,43 @@ export function normalizeCaptureEntry(
     typeof source.contentType === "string" && source.contentType in CAPTURE_CONTENT_TYPES
       ? (source.contentType as CaptureContentType)
       : null;
+  const sourceClip = source.clip && typeof source.clip === "object"
+    ? source.clip as Partial<CaptureClipMeta>
+    : {};
+  const clipPurpose: CaptureClipPurpose =
+    typeof sourceClip.purpose === "string" && sourceClip.purpose in CAPTURE_CLIP_PURPOSES
+      ? sourceClip.purpose as CaptureClipPurpose
+      : "saveFirst";
+  const clipOrigin: CaptureOrigin = sourceClip.origin === "line" ? "line" : "manual";
+  const sourceKind: CaptureSourceKind =
+    sourceClip.sourceKind === "webpage" || sourceClip.sourceKind === "screenshot"
+      ? sourceClip.sourceKind
+      : "note";
+  const sourceWebPreview = sourceClip.webPreview && typeof sourceClip.webPreview === "object"
+    ? sourceClip.webPreview as Partial<CaptureClipMeta["webPreview"]>
+    : {};
+  const webPreviewStatus: CaptureClipMeta["webPreview"]["status"] =
+    sourceWebPreview.status === "ready" || sourceWebPreview.status === "partial" || sourceWebPreview.status === "unavailable"
+      ? sourceWebPreview.status
+      : "none";
+  const attachments: CaptureAttachment[] = Array.isArray(sourceClip.attachments)
+    ? sourceClip.attachments.flatMap((item) => {
+        if (!item || typeof item !== "object") return [];
+        const attachment = item as Partial<CaptureAttachment>;
+        const blockId = stringValue(attachment.blockId).trim().slice(0, 100);
+        if (!blockId) return [];
+        return [{
+          id: stringValue(attachment.id, blockId).trim().slice(0, 100),
+          kind: "image" as const,
+          storage: "notion" as const,
+          blockId,
+          filename: stringValue(attachment.filename, "line-screenshot.jpg").trim().slice(0, 240),
+          mimeType: stringValue(attachment.mimeType, "image/jpeg").trim().slice(0, 100),
+          sourceMessageId: stringValue(attachment.sourceMessageId).trim().slice(0, 200),
+          createdAt: isoDateTime(attachment.createdAt, now),
+        }];
+      }).slice(0, 12)
+    : [];
   const legacyStatus = (source as { status?: string }).status;
   const isLegacy = (source as { version?: number }).version !== 2;
   const legacyWeavingNote = stringValue((source as { weavingNote?: unknown }).weavingNote).trim();
@@ -828,6 +908,24 @@ export function normalizeCaptureEntry(
     excerpt: stringValue(source.excerpt).trim().slice(0, 12000),
     note: stringValue(source.note).trim().slice(0, 3000),
     sourceUrl: normalizedCaptureSourceUrl(source.sourceUrl),
+    clip: {
+      origin: clipOrigin,
+      purpose: clipPurpose,
+      sourceKind,
+      platform: stringValue(sourceClip.platform).trim().slice(0, 100),
+      externalEventId: stringValue(sourceClip.externalEventId).trim().slice(0, 200),
+      externalMessageId: stringValue(sourceClip.externalMessageId).trim().slice(0, 200),
+      awaitingScreenshotUntil: sourceClip.awaitingScreenshotUntil
+        ? isoDateTime(sourceClip.awaitingScreenshotUntil, now)
+        : null,
+      webPreview: {
+        description: stringValue(sourceWebPreview.description).trim().slice(0, 3000),
+        imageUrl: normalizedCaptureSourceUrl(sourceWebPreview.imageUrl),
+        fetchedAt: sourceWebPreview.fetchedAt ? isoDateTime(sourceWebPreview.fetchedAt, now) : null,
+        status: webPreviewStatus,
+      },
+      attachments,
+    },
     status,
     processingDepth,
     contentType,
@@ -861,6 +959,7 @@ export function captureContent(entry: CaptureEntry): FormalCaptureContent {
     excerpt: entry.excerpt,
     note: entry.note,
     sourceUrl: entry.sourceUrl,
+    clip: entry.clip,
     status: entry.status,
     processingDepth: entry.processingDepth,
     contentType: entry.contentType,
