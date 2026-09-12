@@ -9,12 +9,14 @@ import { SPACES, type SpaceKey } from "@/lib/dojo/constants";
 import type { PersonalContinuation } from "@/lib/dojo/continuations";
 import {
   DAILY_TASK_CATEGORIES,
+  ENGLISH_TOUCH_TYPES,
   completedBingoLines,
   emptyDailyRecord,
   mondayOf,
   taipeiTodayISO,
   type DailyRecord,
   type DailyTaskCategory,
+  type EnglishTouchType,
   type MorningDepth,
   type WeeklyBoard,
 } from "@/lib/dojo/formal";
@@ -22,6 +24,7 @@ import { useDojo } from "@/lib/dojo/store";
 import type { CreativeRoleProfile } from "@/lib/dojo/manifestation";
 
 const TASK_ORDER: DailyTaskCategory[] = ["important", "hobby", "health"];
+const ENGLISH_TOUCH_ORDER: EnglishTouchType[] = ["input", "output", "vocabulary", "transfer"];
 const EVENING_FIELDS = {
   light: ["highlight"],
   medium: ["highlight", "block"],
@@ -57,6 +60,18 @@ function formatToday(dateISO: string) {
 function carryOptionLabel(iso: string, index: number) {
   const prefix = index === 0 ? "明天" : index === 1 ? "後天" : `第 ${index + 1} 天`;
   return `${prefix} · ${fmtDateWD(iso)}`;
+}
+
+function isThursday(dateISO: string) {
+  return new Date(`${dateISO}T12:00:00Z`).getUTCDay() === 4;
+}
+
+function englishRhythmStatus(count: number) {
+  if (count === 0) return "今天還沒碰也沒關係";
+  if (count === 1) return "已輕輕碰到 1 項";
+  if (count === 2) return "今日基準完成";
+  if (count === 3) return "今天有多元接觸";
+  return "四個方向都碰到了";
 }
 
 async function readResponse<T>(response: Response): Promise<T> {
@@ -181,6 +196,36 @@ export default function TodayPage() {
       ...current,
       tasks: { ...current.tasks, [category]: { ...current.tasks[category], ...patch } },
     }));
+  }
+
+  function toggleEnglishTouch(touch: EnglishTouchType) {
+    setRecord((current) => {
+      const selected = current.englishRhythm.touches.includes(touch);
+      return {
+        ...current,
+        englishRhythm: {
+          ...current.englishRhythm,
+          touches: selected
+            ? current.englishRhythm.touches.filter((item) => item !== touch)
+            : [...current.englishRhythm.touches, touch],
+        },
+      };
+    });
+  }
+
+  async function saveEnglishRhythm() {
+    const next: DailyRecord = {
+      ...record,
+      englishRhythm: {
+        ...record.englishRhythm,
+        updatedAt: new Date().toISOString(),
+      },
+    };
+    try {
+      await persist(next, "今天的英文微觸已存下來；不占三件事名額。" );
+    } catch {
+      // persist() 已顯示錯誤。
+    }
   }
 
   async function toggleTask(category: DailyTaskCategory) {
@@ -335,6 +380,10 @@ export default function TodayPage() {
   }
 
   const taskDone = TASK_ORDER.filter((category) => record.tasks[category].completed).length;
+  const englishTouchCount = record.englishRhythm.touches.length;
+  const englishTouchLabels = ENGLISH_TOUCH_ORDER
+    .filter((touch) => record.englishRhythm.touches.includes(touch))
+    .map((touch) => ENGLISH_TOUCH_TYPES[touch].label);
   const boardDone = board?.cells.filter((cell) => cell.index !== 12 && cell.completed).length ?? 0;
   return (
     <section className="screen today-screen">
@@ -579,6 +628,55 @@ export default function TodayPage() {
             </button>
           </section>
 
+          <details className="ritual-card english-rhythm-card">
+            <summary>
+              <div>
+                <span className="eyebrow">日常節奏</span>
+                <h2>英文微觸</h2>
+                <small>{isThursday(date) ? "週四休養日・輕輕碰到就好" : "基準 2 項，狀態好可到 4 項"}</small>
+              </div>
+              <span className={`english-rhythm-count ${englishTouchCount >= 2 ? "reached" : ""}`}>
+                {englishTouchCount}/{englishTouchCount > 2 ? 4 : 2}
+              </span>
+            </summary>
+            <div className="english-rhythm-body">
+              <p className="english-rhythm-status">{englishRhythmStatus(englishTouchCount)}</p>
+              <div className="english-touch-grid">
+                {ENGLISH_TOUCH_ORDER.map((touch) => {
+                  const meta = ENGLISH_TOUCH_TYPES[touch];
+                  const selected = record.englishRhythm.touches.includes(touch);
+                  return (
+                    <button
+                      type="button"
+                      key={touch}
+                      className={selected ? "on" : ""}
+                      aria-pressed={selected}
+                      onClick={() => toggleEnglishTouch(touch)}
+                    >
+                      <span>{selected ? "✓" : "○"}</span>
+                      <b>{meta.label}</b>
+                      <small>{meta.examples}</small>
+                    </button>
+                  );
+                })}
+              </div>
+              <label htmlFor="english-rhythm-note">今天留下什麼？（選填）</label>
+              <input
+                id="english-rhythm-note"
+                className="field"
+                value={record.englishRhythm.note}
+                onChange={(event) => setRecord((current) => ({
+                  ...current,
+                  englishRhythm: { ...current.englishRhythm, note: event.target.value },
+                }))}
+                placeholder="一句理解、一個說法，或下次想延續的素材"
+              />
+              <button type="button" className="primary" disabled={saving} onClick={() => void saveEnglishRhythm()}>
+                {saving ? "儲存中…" : "儲存英文微觸"}
+              </button>
+            </div>
+          </details>
+
           <section className="ritual-card daytime-card">
             <span className="eyebrow">白天追蹤</span>
             <h2>留下正在發生的事</h2>
@@ -630,6 +728,14 @@ export default function TodayPage() {
               </div>
               {record.evening.closedAt && <span className="saved-mark">已收光</span>}
             </div>
+
+            {englishTouchCount > 0 && (
+              <div className="evening-english-summary" aria-label="今日英文微觸摘要">
+                <span>日常節奏 · 英文微觸</span>
+                <b>{englishTouchLabels.join("、")} · {englishTouchCount} 項</b>
+                {record.englishRhythm.note && <small>{record.englishRhythm.note}</small>}
+              </div>
+            )}
 
             <details className="measure-disclosure">
               <summary>
