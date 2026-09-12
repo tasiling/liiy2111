@@ -39,6 +39,12 @@ const ENGLISH_CELL_SHORT_LABELS: Record<string, string> = {
   "journal-translation-1": "自譯一段",
   "journal-translation-2": "再譯一段",
   "vocabforge-one-round": "詞彙一輪",
+  "weekly-topic-understanding": "主題理解",
+  "weekly-topic-expression": "主題表達",
+  "independent-material-understanding": "素材理解",
+  "independent-material-expression": "素材表達",
+  "vocabforge-scientific-week": "詞彙淬煉",
+  "cross-date-revisit": "跨日回訪",
   "work-expression-practice": "工作實戰",
 };
 
@@ -476,6 +482,7 @@ export default function BingoPage() {
         <>
           {englishTrack && !board.archivedAt && (
             <EnglishWeeklyPlanner
+              key={weekStart}
               board={board}
               english={englishTrack}
               disabled={saving}

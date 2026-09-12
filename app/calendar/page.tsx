@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useDojo } from "@/lib/dojo/store";
 import {
   DAILY_TASK_CATEGORIES,
+  ENGLISH_TOUCH_TYPES,
   addCalendarDays,
   mondayOf,
   taipeiTodayISO,
@@ -134,6 +135,9 @@ function hasDailyActivity(record?: DailyRecord) {
     record.evening.insight.trim() ||
     record.evening.nextAction.trim() ||
     record.evening.carryNote.trim() ||
+    record.englishRhythm.touches.length > 0 ||
+    record.englishRhythm.vocabForgeRounds > 0 ||
+    record.englishRhythm.note.trim() ||
     TASK_ORDER.some((category) => {
       const task = record.tasks[category];
       return task.text.trim() || task.completed || task.result.trim();
@@ -186,6 +190,16 @@ function CalendarReviewCell({ record, showEmpty = false }: { record?: DailyRecor
     <span className="calendar-review-cell">
       <ReviewMark review={review} />
       {hasDailyTaskPlan(record) && <small>{review.taskProgress.done}/{review.taskProgress.total}</small>}
+      {record.englishRhythm.touches.length > 0 && <EnglishRhythmMarks record={record} />}
+    </span>
+  );
+}
+
+function EnglishRhythmMarks({ record }: { record: DailyRecord }) {
+  const order = ["input", "output", "vocabulary", "transfer"] as const;
+  return (
+    <span className="calendar-english-marks" aria-label={`英文微觸 ${record.englishRhythm.touches.length} 項`}>
+      {order.map((touch) => <i key={touch} className={record.englishRhythm.touches.includes(touch) ? "on" : ""} />)}
     </span>
   );
 }
@@ -479,6 +493,15 @@ function DailyReviewSummary({ date, record, today }: { date: string; record?: Da
         <span>規劃今天的三件事</span>
         <strong>{hasTaskPlan ? `${review.taskProgress.done} / ${review.taskProgress.total} 已完成` : "未設定"}</strong>
       </div>
+
+      {record && record.englishRhythm.touches.length > 0 && (
+        <div className="calendar-english-summary">
+          <span>英文微觸</span>
+          <strong>{record.englishRhythm.touches.length}/4 · {record.englishRhythm.touches.map((touch) => ENGLISH_TOUCH_TYPES[touch].label).join("、")}</strong>
+          {record.englishRhythm.vocabForgeRounds > 0 && <small>VocabForge {record.englishRhythm.vocabForgeRounds} 輪 · {record.englishRhythm.vocabForgeRounds * 5} 個單字席次</small>}
+          {record.englishRhythm.note && <small>{record.englishRhythm.note}</small>}
+        </div>
+      )}
 
       {hasActivity ? (
         <Link className="button-link calendar-review-link" href={date === today ? "/" : `/review?date=${date}`}>

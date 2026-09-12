@@ -18,6 +18,7 @@ import {
   upsertJsonRecord,
 } from "@/lib/dojo/notionStore";
 import { removeUnstartedLearningActivities, syncLearningActivity } from "@/lib/dojo/learningStore";
+import { syncVocabForgeWeeklyBingo } from "@/lib/dojo/englishRhythm";
 
 export const dynamic = "force-dynamic";
 
@@ -95,7 +96,9 @@ export async function PUT(req: NextRequest) {
       if (cell.assignedDate) await syncDailyTaskFromCell(cell, weekStart);
       if (cell.learning) await syncLearningActivity({ weekStart, cell });
     }
-    return NextResponse.json({ ok: true, id: saved.id, board });
+    const vocabForgeCell = board.cells.some((cell) => cell.learning?.templateKey === "vocabforge-scientific-week");
+    const synced = vocabForgeCell ? await syncVocabForgeWeeklyBingo(weekStart) : null;
+    return NextResponse.json({ ok: true, id: saved.id, board: synced?.board ?? board });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }

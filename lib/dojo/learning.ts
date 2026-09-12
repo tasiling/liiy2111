@@ -129,10 +129,14 @@ const VOCABULARY_GROWTH_CANDIDATES: WeeklyLearningCandidate[] = [
 ];
 
 const ENGLISH_FOCUS_CANDIDATES: WeeklyLearningCandidate[] = [
-  { templateKey: "context-room-deep-practice", title: "語境修習・完成一次 First Answer＋Second Take", shortTitle: "語境修習", skill: "綜合表達", path: "practice", practiceType: "context-room", group: "三個核心格", completionCriteria: "選一份 VoiceTube、Magic Tree House、影集、英文遊戲、課堂或生活素材，完成一張話題卡的 First Answer／Draft 與 Second Take／Revised Draft。", completionMode: "single", target: 1, unit: "回", requiresEvidence: false, defaultCategory: "hobby" },
-  { templateKey: "vocabforge-one-round", title: "詞彙淬煉・完成一次 VocabForge 正式完整回合", shortTitle: "詞彙淬煉", skill: "詞彙", path: "practice", practiceType: "vocabulary", group: "三個核心格", completionCriteria: "完成一次 VocabForge 正式完整回合；每日 5 張微萃或單純新增單字不算完成。", completionMode: "single", target: 1, unit: "輪", requiresEvidence: false, defaultCategory: "important" },
-  { templateKey: "work-expression-practice", title: "真實轉用・在工作、課堂或生活中真正使用英文", shortTitle: "真實轉用", skill: "口說", path: "practice", practiceType: "workplace", group: "三個核心格", completionCriteria: "在真實工作、課堂或生活情境使用一次，並記下日期、情境、說法與對方反應。事前默念或同場重說不算。", completionMode: "single", target: 1, unit: "次", requiresEvidence: true, defaultCategory: "important" },
-  { templateKey: "journal-translation-1", title: "日記自譯・完成一段 First Draft＋Revised Draft", shortTitle: "日記自譯", skill: "寫作", path: "practice", practiceType: "journal-translation", group: "本週選配", completionCriteria: "完成一個日記段落的英文初稿、AI 對照，以及自己的 Revised Draft；只口頭翻譯 2–3 句算每日微觸，不完成此格。", completionMode: "single", target: 1, unit: "段", requiresEvidence: false, defaultCategory: "important" },
+  { templateKey: "weekly-topic-understanding", title: "本週主題｜完成素材與三點理解", shortTitle: "主題理解", skill: "聽力", path: "practice", practiceType: "class-topic", group: "主題線 A", completionCriteria: "完成指定課程或 VoiceTube 素材範圍，保存來源並留下至少三個理解重點；只選影片或保存連結不算。", completionMode: "single", target: 1, unit: "份", requiresEvidence: false, defaultCategory: "important" },
+  { templateKey: "weekly-topic-expression", title: "本週主題｜完成 First＋Second Take", shortTitle: "主題表達", skill: "綜合表達", path: "practice", practiceType: "context-room", group: "主題線 A", completionCriteria: "針對本週主題完成一次 First Answer／Draft，以及修改後的 Second Take／Revised Draft。", completionMode: "single", target: 1, unit: "回", requiresEvidence: false, defaultCategory: "hobby" },
+  { templateKey: "independent-material-understanding", title: "自主素材｜完成一批理解整理", shortTitle: "素材理解", skill: "閱讀", path: "practice", practiceType: "reading", group: "素材線 B", completionCriteria: "完成一本書、一集影集、一段遊戲或生活經歷的指定內容批次，留下三至五句整理。", completionMode: "single", target: 1, unit: "批", requiresEvidence: false, defaultCategory: "hobby" },
+  { templateKey: "independent-material-expression", title: "自主素材｜完成重述與修改", shortTitle: "素材表達", skill: "綜合表達", path: "practice", practiceType: "context-room", group: "素材線 B", completionCriteria: "完成一張話題卡、讀後重述或 GPT 對話，保留第一次回答與修改後結果。", completionMode: "single", target: 1, unit: "回", requiresEvidence: false, defaultCategory: "hobby" },
+  { templateKey: "vocabforge-scientific-week", title: "VocabForge｜跨三天累計五輪科學複習", shortTitle: "詞彙淬煉", skill: "詞彙", path: "practice", practiceType: "vocabulary", group: "詞彙與轉用", completionCriteria: "至少分布於三個不同日期，累計完成五輪；每輪為五個單字及系統當次安排的科學複習項目，主動回想不一定出現。", completionMode: "single", target: 1, unit: "週", requiresEvidence: false, defaultCategory: "important" },
+  { templateKey: "work-expression-practice", title: "真實轉用｜在工作、課堂或生活中真正使用英文", shortTitle: "真實轉用", skill: "口說", path: "practice", practiceType: "workplace", group: "詞彙與轉用", completionCriteria: "在真實工作、課堂或生活情境使用一次，並記下日期、情境、說法與對方反應；事前默念不算。", completionMode: "single", target: 1, unit: "次", requiresEvidence: true, defaultCategory: "important" },
+  { templateKey: "journal-translation-1", title: "日記自譯｜完成一段 First Draft＋Revised Draft", shortTitle: "日記自譯", skill: "寫作", path: "practice", practiceType: "journal-translation", group: "本週選配", completionCriteria: "完成一個日記段落的英文初稿、AI／GPT 對照，以及自己的 Revised Draft；只口頭翻譯二至三句算每日微觸，不完成此格。", completionMode: "single", target: 1, unit: "段", requiresEvidence: false, defaultCategory: "important" },
+  { templateKey: "cross-date-revisit", title: "跨日回訪｜隔天後回到舊素材再次表達", shortTitle: "跨日回訪", skill: "綜合表達", path: "practice", practiceType: "context-room", group: "本週選配", completionCriteria: "與第一次練習相隔至少一個日期，再次快速重述、回答新題或使用核心表達；同場連續重說不算。", completionMode: "single", target: 1, unit: "回", requiresEvidence: false, defaultCategory: "health" },
 ];
 
 export function englishWeeklyCandidates(mode: EnglishWeeklyMode): WeeklyLearningCandidate[] {
@@ -143,8 +147,8 @@ export function englishFocusWeeklyCandidates(): WeeklyLearningCandidate[] {
   return ENGLISH_FOCUS_CANDIDATES.map((item) => ({ ...item }));
 }
 
-// 專屬工作台尚未完成前，週盤依真實手動負擔只放四格。後續工具成熟時，
-// englishWeeklyCandidates 仍保留完整五格規格，方便切回自動化版本。
+// 舊模式仍保留給既有資料正規化；新週盤改由 englishFocusWeeklyCandidates
+// 提供六個核心成果與兩個可自由選配成果。
 export function englishManualWeeklyCandidates(mode: EnglishWeeklyMode): WeeklyLearningCandidate[] {
   const candidates = mode === "vocabulary-growth" ? VOCABULARY_GROWTH_CANDIDATES : FOUNDATION_WRITING_CANDIDATES;
   const selectedKeys = mode === "vocabulary-growth"

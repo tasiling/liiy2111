@@ -116,6 +116,7 @@ export type DailyRecord = {
   tasks: Record<DailyTaskCategory, DailyTask>;
   englishRhythm: {
     touches: EnglishTouchType[];
+    vocabForgeRounds: number;
     note: string;
     updatedAt: string | null;
   };
@@ -403,7 +404,7 @@ export function emptyDailyRecord(date = taipeiTodayISO()): DailyRecord {
       hobby: emptyTask("hobby"),
       health: emptyTask("health"),
     },
-    englishRhythm: { touches: [], note: "", updatedAt: null },
+    englishRhythm: { touches: [], vocabForgeRounds: 0, note: "", updatedAt: null },
     daytime: { logs: [], note: "" },
     evening: {
       depth: null,
@@ -458,6 +459,14 @@ export function normalizeDailyRecord(value: unknown, expectedDate: string): Dail
   const englishRhythm = source.englishRhythm && typeof source.englishRhythm === "object"
     ? source.englishRhythm
     : base.englishRhythm;
+  const vocabForgeRounds = Math.max(0, Math.min(5, Math.round(Number(englishRhythm.vocabForgeRounds) || 0)));
+  const englishTouches = Array.isArray(englishRhythm.touches)
+    ? Array.from(new Set(englishRhythm.touches.filter(
+        (item): item is EnglishTouchType =>
+          item === "input" || item === "output" || item === "vocabulary" || item === "transfer"
+      )))
+    : [];
+  if (vocabForgeRounds > 0 && !englishTouches.includes("vocabulary")) englishTouches.push("vocabulary");
   const state = morning.state === "低" || morning.state === "穩" || morning.state === "亮" ? morning.state : null;
   const explicitMorningDepth = morning.depth === "light" || morning.depth === "medium" || morning.depth === "deep"
     ? morning.depth
@@ -511,12 +520,8 @@ export function normalizeDailyRecord(value: unknown, expectedDate: string): Dail
       health: normalizeTask(tasks.health, "health"),
     },
     englishRhythm: {
-      touches: Array.isArray(englishRhythm.touches)
-        ? Array.from(new Set(englishRhythm.touches.filter(
-            (item): item is EnglishTouchType =>
-              item === "input" || item === "output" || item === "vocabulary" || item === "transfer"
-          ))).slice(0, 4)
-        : [],
+      touches: englishTouches.slice(0, 4),
+      vocabForgeRounds,
       note: stringValue(englishRhythm.note).slice(0, 1000),
       updatedAt: nullableString(englishRhythm.updatedAt),
     },
