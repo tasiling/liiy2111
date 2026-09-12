@@ -2238,7 +2238,7 @@
 }
 .dojo .calendar-rich .calendar-grid button {
   display: grid;
-  grid-template-rows: 22px minmax(34px, 1fr);
+  grid-template-rows: 20px minmax(40px, 1fr);
   align-items: stretch;
   min-height: 65px;
   padding: 4px;
@@ -2277,6 +2277,15 @@
   z-index: 1;
   line-height: 23px;
 }
+.dojo .calendar-rich .calendar-date-row {
+  align-items: center;
+  justify-content: center;
+}
+.dojo .calendar-rich .calendar-date-row > b {
+  font-size: 13px;
+  line-height: 20px;
+  text-align: center;
+}
 .dojo .calendar-grid button.outside {
   opacity: 0.35;
 }
@@ -2284,8 +2293,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 23px;
-  height: 23px;
+  width: 21px;
+  height: 21px;
   border-radius: 50%;
   background: #4d6557;
   color: white;
@@ -2310,7 +2319,7 @@
   justify-self: center;
   display: grid;
   justify-items: center;
-  gap: 1px;
+  gap: 2px;
   min-width: 0;
   pointer-events: none;
 }
@@ -2319,8 +2328,8 @@
   font-size: 8px;
   line-height: 1;
 }
-.dojo .calendar-english-marks { display: grid; grid-template-columns: repeat(4, 4px); gap: 2px; height: 2px; }
-.dojo .calendar-english-marks i { width: 4px; height: 2px; border-radius: 999px; background: #dfe4dc; }
+.dojo .calendar-english-marks { display: grid; grid-template-columns: repeat(4, 4px); gap: 2px; min-height: 4px; margin-top: 1px; }
+.dojo .calendar-english-marks i { width: 4px; height: 4px; border: 1px solid #d5ddd3; border-radius: 50%; background: transparent; }
 .dojo .calendar-english-marks i.on { background: #6f836f; }
 .dojo .calendar-review-mark {
   width: 24px;
@@ -2541,10 +2550,20 @@
   border-radius: 12px;
   background: #eef1ed;
 }
-.dojo .calendar-english-summary { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; margin: -7px 0 16px; padding: 11px 12px; border: 1px solid #cbd6c7; border-radius: 12px; background: #f2f6ef; }
-.dojo .calendar-english-summary span { color: #667a65; font-size: 12px; }
-.dojo .calendar-english-summary strong { color: #405b43; font-size: 12px; text-align: right; }
-.dojo .calendar-english-summary small { grid-column: 1 / -1; color: var(--muted); font-size: 9px; line-height: 1.45; }
+.dojo .calendar-rhythm-panel { margin: -7px 0 16px; padding: 12px; border: 1px solid #cbd6c7; border-radius: 14px; background: linear-gradient(145deg, #f7faf5, #edf3eb); }
+.dojo .calendar-rhythm-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.dojo .calendar-rhythm-heading div > span,
+.dojo .calendar-rhythm-heading div > strong { display: block; }
+.dojo .calendar-rhythm-heading div > span { color: #71816f; font-size: 9px; font-weight: 750; }
+.dojo .calendar-rhythm-heading div > strong { margin-top: 2px; color: #405b43; font: 650 16px "Noto Serif TC", serif; }
+.dojo .calendar-rhythm-heading > b { color: #405b43; font-size: 17px; }
+.dojo .calendar-rhythm-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
+.dojo .calendar-rhythm-steps > div { display: grid; place-items: center; gap: 3px; min-width: 0; padding: 8px 3px; border-radius: 10px; background: rgba(255,255,255,.72); color: #8a9487; }
+.dojo .calendar-rhythm-steps > div.on { background: #dfe9dc; color: #405b43; }
+.dojo .calendar-rhythm-steps i { font-size: 12px; font-style: normal; line-height: 1; }
+.dojo .calendar-rhythm-steps span { font-size: 9px; font-weight: 700; }
+.dojo .calendar-rhythm-panel > p { margin: 9px 0 0; color: #657463; font-size: 10px; }
+.dojo .calendar-rhythm-panel > small { display: block; margin-top: 4px; color: var(--muted); font-size: 9px; line-height: 1.45; }
 .dojo .calendar-empty-copy {
   margin: 0;
   color: var(--muted);
