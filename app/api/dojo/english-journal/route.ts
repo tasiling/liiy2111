@@ -18,7 +18,12 @@ import {
 } from "@/lib/dojo/englishJournal";
 import { formatDailyJournalText } from "@/lib/dojo/journalExport";
 import { syncLearningActivity } from "@/lib/dojo/learningStore";
-import { listJsonRecords, readJsonRecord, upsertJsonRecord } from "@/lib/dojo/notionStore";
+import {
+  archiveJsonRecordById,
+  listJsonRecords,
+  readJsonRecord,
+  upsertJsonRecord,
+} from "@/lib/dojo/notionStore";
 
 export const dynamic = "force-dynamic";
 
@@ -286,6 +291,22 @@ export async function PATCH(req: NextRequest) {
       ? await completeWeeklyJournalCell(candidate, completeSegmentId)
       : false;
     return NextResponse.json({ ok: true, practice: candidate, weeklySynced });
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const date = req.nextUrl.searchParams.get("date") ?? "";
+    if (!DATE_RE.test(date)) {
+      return NextResponse.json({ error: "日記日期不正確" }, { status: 400 });
+    }
+    const title = englishJournalRecordTitle(date);
+    const row = await readJsonRecord(title);
+    if (!row) return NextResponse.json({ error: "找不到這篇英文練習" }, { status: 404 });
+    await archiveJsonRecordById(row.id, ENGLISH_JOURNAL_TITLE_PREFIX);
+    return NextResponse.json({ ok: true, date });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }

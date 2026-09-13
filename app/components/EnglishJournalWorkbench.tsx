@@ -78,12 +78,15 @@ export default function EnglishJournalWorkbench({
       const result = await responseJson<{ practices: EnglishJournalPractice[]; sources: JournalSource[] }>(response);
       setPractices(result.practices ?? []);
       setSources(result.sources ?? []);
-      const preferredDate = initialDate ?? selectedDate ?? result.practices[0]?.date ?? null;
-      if (preferredDate) {
-        const existing = result.practices.find((practice) => practice.date === preferredDate) ?? null;
-        setSelectedDate(existing?.date ?? null);
-        setDraft(existing ? structuredClone(existing) : null);
-      }
+      const requestedDate = initialDate ?? selectedDate;
+      const requestedPractice = requestedDate
+        ? result.practices.find((practice) => practice.date === requestedDate) ?? null
+        : null;
+      const practiceToOpen = requestedPractice && requestedPractice.status !== "completed"
+        ? requestedPractice
+        : result.practices.find((practice) => practice.status !== "completed") ?? null;
+      setSelectedDate(practiceToOpen?.date ?? null);
+      setDraft(practiceToOpen ? structuredClone(practiceToOpen) : null);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
@@ -102,6 +105,7 @@ export default function EnglishJournalWorkbench({
     if (!initialDate || loading) return;
     const existing = practices.find((practice) => practice.date === initialDate);
     if (existing) {
+      if (existing.status === "completed") return;
       if (selectedDate !== initialDate) {
         const timer = window.setTimeout(() => {
           setSelectedDate(initialDate);
@@ -170,6 +174,42 @@ export default function EnglishJournalWorkbench({
       setActiveSegment(0);
       setReviewing(false);
       setNotice(`已切成 ${result.practice.segments.length} 段，中文原文快照不會被改寫。`);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deletePractice(practice: EnglishJournalPractice) {
+    const hasExternalResults = practice.status === "completed"
+      || practice.vocabForgeExports.length > 0
+      || practice.contextExports.length > 0;
+    const confirmed = window.confirm(hasExternalResults
+      ? `確定移除 ${formatDate(practice.date)} 的英文自譯嗎？\n\n中文原日記會保留；已完成的週盤、VocabForge 單字或語境素材不會回滾。`
+      : `確定移除 ${formatDate(practice.date)} 的英文自譯嗎？\n\n中文原日記會保留，之後仍可重新加入自譯。`);
+    if (!confirmed) return;
+
+    setSaving(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const response = await fetch(`/api/dojo/english-journal?date=${encodeURIComponent(practice.date)}`, {
+        method: "DELETE",
+      });
+      await responseJson<{ ok: true; date: string }>(response);
+      setPractices((current) => current.filter((item) => item.date !== practice.date));
+      if (selectedDate === practice.date) {
+        setSelectedDate(null);
+        setDraft(null);
+        setReviewing(false);
+        setActiveSegment(0);
+      }
+      setSources((current) => current.some((item) => item.date === practice.date)
+        ? current
+        : [{ date: practice.date, title: "這一天的日記", sourceText: practice.sourceText }, ...current]
+          .sort((a, b) => b.date.localeCompare(a.date)));
+      setNotice(`${formatDate(practice.date)} 的英文自譯已移除；中文原日記仍然保留。`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
@@ -391,7 +431,10 @@ export default function EnglishJournalWorkbench({
                   <small>{formatDate(draft.date)}</small>
                   <b>{reviewing ? "全文中英回看" : `第 ${activeSegment + 1} 段，共 ${draft.segments.length} 段`}</b>
                 </div>
-                <button type="button" className="text-link" onClick={() => { setDraft(null); setSelectedDate(null); }}>收起</button>
+                <div className="english-journal-editor-controls">
+                  <button type="button" className="text-link" onClick={() => { setDraft(null); setSelectedDate(null); }}>收起</button>
+                  <button type="button" className="text-link danger" disabled={saving} onClick={() => void deletePractice(draft)}>刪除這篇</button>
+                </div>
               </div>
 
               <div className="english-segment-map" aria-label="段落位置">

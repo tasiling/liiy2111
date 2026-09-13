@@ -4203,6 +4203,13 @@
 .dojo .english-journal-editor-title b { display: block; }
 .dojo .english-journal-editor-title small { color: var(--muted); font-size: 9px; }
 .dojo .english-journal-editor-title b { margin-top: 2px; color: #45657d; font-size: 12px; }
+.dojo .english-journal-editor-controls {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+.dojo .english-journal-editor-controls .danger { color: #a4524b; }
 .dojo .english-journal-editor > label {
   display: block;
   margin: 13px 0 6px;
